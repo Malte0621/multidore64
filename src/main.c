@@ -23,6 +23,10 @@ char p1_x = 0, p1_y = 0,
      p2_x = 0, p2_y = 0;
 
 char p1_lastDir = 0, p2_lastDir = 0;
+char p1_bo = 0, p2_bo = 0; // Black Over (How many times the player has gone over a black pixel)
+char p1_nd = 0, p2_nd = 0; // Near Death (When the player is near death and has a last chance to survive)
+
+char nearDeathSaveTicks = 2; // how many ticks the player has to survive after being near death
 
 // Make a table where old colors are stored
 
@@ -108,24 +112,17 @@ void restoreFromMap(unsigned char color)
     }
 }
 
-void findAndFloodFill(unsigned char findColor, unsigned char color)
+void findAndFloodFill(unsigned char x, unsigned char y, unsigned char color, unsigned char stopColor)
 {
-    // Loop through the map and fill all connected shapes with the same color
-    unsigned char x;
-    unsigned char y;
-
-    // Loop through the pixels on screen and find all pixels with the "findColor" color
-    // Then flood fill all connected pixels with the "color" color including the pixels within the areas that are already filled with the "color" color
-    for (x = 0; x < 40; x++)
+    unsigned char cx;
+    unsigned char cy;
+    // Get the center of the shape
+    if (renderlib_findcenter(x, y, &cx, &cy))
     {
-        for (y = 0; y < 25; y++)
-        {
-            if (renderlib_getpixel(x, y) == findColor)
-            {
-                renderlib_floodfill(x, y, color, findColor);
-            }
-        }
+        // Flood fill the shape
+        renderlib_floodfill(cx, cy, color, stopColor);
     }
+    replaceColor(stopColor, color);
 }
 
 void respawn(unsigned char port, unsigned char color)
@@ -134,7 +131,7 @@ void respawn(unsigned char port, unsigned char color)
     {
         draw(p1_x, p1_y, map[p1_x][p1_y]);
         replaceColor(player1_color, color);
-        restoreFromMap(player1_color);
+        restoreFromMap(player1_character_color);
         p1_x = rand() % 37;
         p1_y = rand() % 22;
         while (p1_x == p2_x && p1_y == p2_y)
@@ -153,12 +150,14 @@ void respawn(unsigned char port, unsigned char color)
         draw(p1_x + 1, p1_y - 1, player1_color);
         draw(p1_x - 1, p1_y + 1, player1_color);
         p1_lastDir = 1;
+        p1_bo = 0;
+        p1_nd = 0;
     }
     else
     {
         draw(p2_x, p2_y, map[p2_x][p2_y]);
         replaceColor(player2_color, color);
-        restoreFromMap(player2_color);
+        restoreFromMap(player2_character_color);
         // Do not spawn on the same position as player 1
         p2_x = rand() % 37;
         p2_y = rand() % 22;
@@ -178,6 +177,8 @@ void respawn(unsigned char port, unsigned char color)
         draw(p2_x + 1, p2_y - 1, player2_color);
         draw(p2_x - 1, p2_y + 1, player2_color);
         p2_lastDir = 1;
+        p2_bo = 0;
+        p2_nd = 0;
     }
 }
 
@@ -226,30 +227,50 @@ void handleInput(unsigned char port)
         }
         if (isCollidingWith(p1_x, p1_y, player1_character_color))
         {
-            // Player 1 dies.
-            respawn(0, 0);
+            p1_x = prevX;
+            p1_y = prevY;
+            if (p1_nd >= nearDeathSaveTicks)
+            {
+                // Player 1 dies.
+                respawn(0, 0);
+            }
+            else
+            {
+                p1_nd++;
+            }
             return;
+        }else{
+            p1_nd = 0;
         }
-        if (isCollidingWith(p1_x, p1_y, player1_color))
+        if (isCollidingWith(prevX, prevY, 0))
+        {
+            p1_bo++;
+        }
+        if (isCollidingWith(p1_x, p1_y, player1_color) && p1_bo > 0)
         {
             // Fill the connected area with the player 1 color.
-            findAndFloodFill(player1_character_color, player1_color);
+            findAndFloodFill(prevX, prevY, player1_color, player1_character_color);
+            p1_bo = 0;
         }
         if (p1_x < 0)
         {
             p1_x = 0;
+            p1_lastDir = 1;
         }
         else if (p1_x > max_x)
         {
             p1_x = max_x;
+            p1_lastDir = 1;
         }
         if (p1_y < 0)
         {
             p1_y = 0;
+            p1_lastDir = 1;
         }
         else if (p1_y > max_y)
         {
             p1_y = max_y;
+            p1_lastDir = 1;
         }
         if (p2_lastDir == 0)
         {
@@ -304,30 +325,50 @@ void handleInput(unsigned char port)
         }
         if (isCollidingWith(p2_x, p2_y, player2_character_color))
         {
-            // Player 2 dies.
-            respawn(1, 0);
+            p2_x = prevX;
+            p2_y = prevY;
+            if (p2_nd >= nearDeathSaveTicks)
+            {
+                // Player 2 dies.
+                respawn(1, 0);
+            }
+            else
+            {
+                p2_nd++;
+            }
             return;
+        }else{
+            p2_nd = 0;
         }
-        if (isCollidingWith(p2_x, p2_y, player2_color))
+        if (isCollidingWith(prevX, prevY, 0))
+        {
+            p2_bo++;
+        }
+        if (isCollidingWith(p2_x, p2_y, player2_color) && p2_bo > 0)
         {
             // Fill the connected area with the player 2 color.
-            findAndFloodFill(player2_character_color, player2_color);
+            findAndFloodFill(prevX, prevY, player2_color, player2_character_color);
+            p2_bo = 0;
         }
         if (p2_x < 0)
         {
             p2_x = 0;
+            p2_lastDir = 1;
         }
         else if (p2_x > max_x)
         {
             p2_x = max_x;
+            p2_lastDir = 1;
         }
         if (p2_y < 0)
         {
             p2_y = 0;
+            p2_lastDir = 1;
         }
         else if (p2_y > max_y)
         {
             p2_y = max_y;
+            p2_lastDir = 1;
         }
         if (p1_lastDir == 0)
         {
@@ -344,13 +385,12 @@ void handleInput(unsigned char port)
 
 int main(void)
 {
-    int timeLeft = 120 * 10;
+    int timeLeft = 240;
     int p1Score = 0;
     int p2Score = 0;
     int i;
     int j;
-    char* key;
-	
+
     renderlib_init();
     soundlib_init();
     controller_init();
@@ -368,18 +408,23 @@ int main(void)
     soundlib_stop();
     renderlib_clear();
 
+    resetGame();
 
     // Game Loop
     while (1)
     {
         char *timeLeftStr = malloc(100);
         char *p1state = malloc(100);
+        char *p1nd = malloc(50);
 
         sprintf(timeLeftStr, "time left: %i", timeLeft);
         renderlib_drawstring(0, 1, color_white, timeLeftStr);
 
         sprintf(p1state, "player 1 state: %i", p1_lastDir);
         renderlib_drawstring(0, 2, color_white, p1state);
+
+        sprintf(p1nd, "player 1 nd: %i", p1_nd);
+        renderlib_drawstring(0, 3, color_white, p1nd);
 
         // check if the letter "Q" was pressed
         if (controller_ispressed(0x11))
@@ -392,7 +437,7 @@ int main(void)
         handleInput(0);
         handleInput(1);
 
-        sleep(25);
+        sleep(750);
 
         if (timeLeft > 0)
         {

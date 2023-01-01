@@ -19,6 +19,7 @@ void renderlib_setcolor(unsigned char background, unsigned char foreground); // 
 void renderlib_setpixel(unsigned char x, unsigned char y, unsigned char color); // Set a pixel
 unsigned char renderlib_getpixel(unsigned char x, unsigned char y); // Get a pixel
 void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, unsigned char stopColor); // Floodfill a color
+char renderlib_findcenter(unsigned char x, unsigned char y, unsigned char *outX, unsigned char *outY); // Find the center of a shape
 
 void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color, unsigned char c); // Draw a character
 unsigned char renderlib_getchar(unsigned char x, unsigned char y); // Get a drawn character

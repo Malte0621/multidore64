@@ -138,7 +138,7 @@ void renderlib_setpixel(unsigned char x, unsigned char y, unsigned char color)
         initErrorMsg();
         return;
     }
-    
+
     // Set the color of the pixel at position (x, y) to the desired color
     renderlib_drawchar(x, y, color, 224);
 }
@@ -169,7 +169,8 @@ void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color,
     }
 }
 
-void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, unsigned char stopColor) {
+void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, unsigned char stopColor)
+{
     // Get the shape around x, y
     // Fill outwards until we reach the edge of the shape
 
@@ -190,29 +191,112 @@ void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, 
     if (x > 0)
     {
         // Fill the pixel to the left
-        renderlib_floodfill(x - 1, y, stopColor, color);
+        renderlib_floodfill(x - 1, y, color, stopColor);
     }
 
     // Check if the pixel is on the right edge
-    if (x < 39)
+    if (x < 40)
     {
         // Fill the pixel to the right
-        renderlib_floodfill(x + 1, y, stopColor, color);
+        renderlib_floodfill(x + 1, y, color, stopColor);
     }
 
     // Check if the pixel is on the top edge
     if (y > 0)
     {
         // Fill the pixel above
-        renderlib_floodfill(x, y - 1, stopColor, color);
+        renderlib_floodfill(x, y - 1, color, stopColor);
     }
 
     // Check if the pixel is on the bottom edge
-    if (y < 23)
+    if (y < 25)
     {
         // Fill the pixel below
-        renderlib_floodfill(x, y + 1, stopColor, color);
+        renderlib_floodfill(x, y + 1, color, stopColor);
     }
+}
+
+// Find the center of a filled shape using one pixel from the edge of it.
+char renderlib_findcenter(unsigned char x, unsigned char y, unsigned char *outX, unsigned char *outY)
+{
+    unsigned char diff;
+    unsigned char tmp;
+    char useTemp;
+    unsigned char i;
+    unsigned char currentColor = renderlib_getpixel(x, y);
+
+    for (i = x; i < 40; i++)
+    {
+        // Check if the color of the pixel at position (i, j) is the same as the current color
+        if (renderlib_getpixel(i, y) == currentColor)
+        {
+            break;
+        }
+        else
+        {
+            diff++;
+        }
+    }
+    tmp = diff;
+    useTemp = 1;
+    for (i = x; i > 0; i--)
+    {
+        // Check if the color of the pixel at position (i, j) is the same as the current color
+        if (renderlib_getpixel(i, y) == currentColor)
+        {
+            break;
+        }
+        else
+        {
+            if (tmp <= 0)
+            {
+                return 0;
+            }
+            else
+            {
+                tmp--;
+            }
+        }
+    }
+    (*outX) = x + diff - tmp;
+    // Do the same for the y axis
+    diff = 0;
+    tmp = 0;
+    useTemp = 1;
+    for (i = y; i < 25; i++)
+    {
+        // Check if the color of the pixel at position (i, j) is the same as the current color
+        if (renderlib_getpixel(x, i) == currentColor)
+        {
+            break;
+        }
+        else
+        {
+            diff++;
+        }
+    }
+    tmp = diff;
+    for (i = y; i > 0; i--)
+    {
+        // Check if the color of the pixel at position (i, j) is the same as the current color
+        if (renderlib_getpixel(x, i) == currentColor)
+        {
+            break;
+        }
+        else
+        {
+            if (tmp <= 0)
+            {
+                return 0;
+            }
+            else
+            {
+                tmp--;
+            }
+        }
+    }
+    (*outY) = y + diff - tmp;
+    return 1;
 }
 
 void renderlib_fillrect(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char color)
@@ -298,7 +382,7 @@ void renderlib_fillsphere(unsigned char x, unsigned char y, unsigned char r, uns
     }
 }
 
-void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char* sprite)
+void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char *sprite)
 {
     unsigned char i = 0;
     unsigned char j = 0;
