@@ -1,5 +1,8 @@
 rm -rf build
-mkdir build >/dev/null
+# Check if the build directory doesn't exist
+if [ ! -d ../build ]; then
+    mkdir build >/dev/null
+fi
 cd src
 # Loop through all .c files in the current directory
 for file in *.c
@@ -20,11 +23,14 @@ do
     cp $file ../build
 done
 
-for file in *.cfg
-do
-    # Copy each .cfg file into the build directory
-    cp $file ../build
-done
+# check if ANY .cfg file exists in the current directory
+if [ -f *.cfg ]; then
+    for file in *.cfg
+    do
+        # Copy each .cfg file into the build directory
+        cp $file ../build
+    done
+fi
 
 cd ../build
 
@@ -36,7 +42,11 @@ do
 done
 
 ca65 ./main.s
-mkdir ../dist >/dev/null
+# Check if the dist directory doesn't exist
+if [ ! -d ../dist ]; then
+    # Create the dist directory
+    mkdir ../dist >/dev/null
+fi
 
 # Link all .o files into a .prg file
 # ld65 -o ../dist/main -t c64 main.o c64.lib
