@@ -1,0 +1,1 @@
+gcc -o ./sprite_converter ./sprite_converter.c
