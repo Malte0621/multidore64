@@ -1,4 +1,5 @@
 rm -rf build
+rm -rf dist
 # Check if the build directory doesn't exist
 if [ ! -d ../build ]; then
     mkdir build >/dev/null
@@ -65,8 +66,7 @@ else
     ld65 -o ../dist/main.d64 -t c64 $obj_files c64.lib
 fi
 
-# Check if a any "Error" message was printed
-if [ $? -eq 0 ]; then
+if [ -f ../dist/main.d64 ]; then
     # Print a success message
     echo "Build successful!"
     # Exit with a success code

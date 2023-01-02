@@ -1,6 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 rmdir /s /q build
+rmdir /s /q dist
 mkdir build 2>nul
 cd src
 :: Loop through all .c files in the current directory
@@ -43,5 +44,15 @@ if exist c64.cfg (
     :: Link all .o files into a .prg file
     ld65 -o ../dist/main.d64 -t c64 %files% c64.lib
 )
-echo Done.
+
+:: Check if any "Error" were printed
+if not exist ../dist/main.d64 (
+    :: Print the error message
+    echo Build failed.
+    :: Exit with error code
+    exit /b 1
+)
+:: Print the success message
+echo Build succeeded.
+
 pause
