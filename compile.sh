@@ -65,4 +65,15 @@ else
     ld65 -o ../dist/main.d64 -t c64 $obj_files c64.lib
 fi
 
-echo Done.
+# Check if a any "Error" message was printed
+if [ $? -eq 0 ]; then
+    # Print a success message
+    echo "Build successful!"
+    # Exit with a success code
+    exit 0
+else
+    # Print an error message
+    echo "Build failed!"
+    # Exit with an error code
+    exit 1
+fi
