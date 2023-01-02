@@ -41,7 +41,6 @@ do
     ca65 -o ${file%.*}.o $file
 done
 
-ca65 ./main.s
 # Check if the dist directory doesn't exist
 if [ ! -d ../dist ]; then
     # Create the dist directory
