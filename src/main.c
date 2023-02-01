@@ -385,7 +385,7 @@ void handleInput(unsigned char port)
 
 int main(void)
 {
-    char debug = 0;
+    char debug = 1;
     int timeLeft = 240;
     int p1Score = 0;
     int p2Score = 0;
@@ -430,7 +430,7 @@ int main(void)
         }
 
         // check if the letter "Q" was pressed
-        if (controller_ispressed(0x51))
+        if (controller_ispressed(0x51)) // TODO: Correct this.
         {
             // if so, exit the program
             break;
