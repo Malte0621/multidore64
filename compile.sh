@@ -9,7 +9,7 @@ cd src
 for file in *.c
 do
     # Compile each .c file into a .s file
-    cc65 -O -o ../build/${file%.*}.s -t c64 $file
+    cc65 -O -o ../build/${file}.s -t c64 $file
 done
 
 for file in *.s
@@ -39,7 +39,7 @@ cd ../build
 for file in *.s
 do
     # Assemble each .s file into a .o file
-    ca65 -o ${file%.*}.o $file
+    ca65 -o ${file}.o $file
 done
 
 # Check if the dist directory doesn't exist
