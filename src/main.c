@@ -385,6 +385,7 @@ void handleInput(unsigned char port)
 
 int main(void)
 {
+    char debug = 0;
     int timeLeft = 240;
     int p1Score = 0;
     int p2Score = 0;
@@ -413,21 +414,23 @@ int main(void)
     // Game Loop
     while (1)
     {
-        char *timeLeftStr = malloc(100);
-        char *p1state = malloc(100);
-        char *p1nd = malloc(50);
+        if (debug){
+            char *timeLeftStr = malloc(100);
+            char *p1state = malloc(100);
+            char *p1nd = malloc(50);
 
-        sprintf(timeLeftStr, "time left: %i", timeLeft);
-        renderlib_drawstring(0, 1, color_white, timeLeftStr);
+            sprintf(timeLeftStr, "time left: %i", timeLeft);
+            renderlib_drawstring(0, 1, color_white, timeLeftStr);
 
-        sprintf(p1state, "player 1 state: %i", p1_lastDir);
-        renderlib_drawstring(0, 2, color_white, p1state);
+            sprintf(p1state, "player 1 state: %i", p1_lastDir);
+            renderlib_drawstring(0, 2, color_white, p1state);
 
-        sprintf(p1nd, "player 1 nd: %i", p1_nd);
-        renderlib_drawstring(0, 3, color_white, p1nd);
+            sprintf(p1nd, "player 1 nd: %i", p1_nd);
+            renderlib_drawstring(0, 3, color_white, p1nd);
+        }
 
         // check if the letter "Q" was pressed
-        if (controller_ispressed(0x11))
+        if (controller_ispressed(0x51))
         {
             // if so, exit the program
             break;
