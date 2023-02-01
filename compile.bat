@@ -21,13 +21,13 @@ for %%F in (*.cfg) do (
     :: Copy each .cfg file into the build directory
     copy %%F ..\build\%%F
 )
-cd ../build
+cd ..\build
 :: Loop through all .s files in the build directory
 for %%f in (*.s) do (
     :: Compile each .s file into a .o file
     ca65 -o %%f.o %%f
 )
-mkdir ../dist 2>nul
+mkdir ..\dist 2>nul
 :: Link all .o files into a .prg file
 :: ld65 -o ../dist/main -t c64 main.o c64.lib
 :: Loop through all .o files in the build directory and add them to the link command
@@ -35,7 +35,7 @@ set files=
 for %%f in (*.o) do (
     set files=!files! %%f
 )
-echo %files%
+
 : Check if c64.cfg exist in the build directory
 if exist c64.cfg (
     :: Link all .o files into a .prg file
