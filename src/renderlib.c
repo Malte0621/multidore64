@@ -426,3 +426,58 @@ void renderlib_init(void)
     hasBeenInitialized = 1;
     renderlib_setcolor(0, 0);
 }
+
+// RenderLib 3D Implementation //
+
+int cpos[3] = {0,0,0};
+int crot[3] = {0,0,0};
+int cscl[3] = {5,5,15}; // 10 = 1m
+
+void renderlib3d_setcpos(int x, int y, int z){
+    cpos[0] = x;
+    cpos[1] = y;
+    cpos[2] = z;
+}
+
+void renderlib3d_setcrot(int x, int y, int z){
+    crot[0] = x;
+    crot[1] = y;
+    crot[2] = z;
+}
+
+void renderlib3d_setcscl(int x, int y, int z){
+    cscl[0] = x;
+    cscl[1] = y;
+    cscl[2] = z;
+}
+
+unsigned char cobj = 0;
+int cubes[255][9];
+
+void renderlib3d_init(void){
+    unsigned char i;
+    if (hasBeenInitialized == 0){
+        renderlib_init();
+    } 
+    // Default values reset //
+    for (i = 0; i < 255; i++){
+        memset(cubes[i], 0, 9);
+    }
+    cobj = 0;
+    renderlib3d_setcpos(0,0,0);
+    renderlib3d_setcrot(0,0,0);
+    renderlib3d_setcscl(5,5,15);
+}
+
+void renderlib3d_drawcube(int posx, int posy, int posz, int rotx, int roty, int rotz, int sclx, int scly, int sclz, unsigned char color){
+    cobj++;
+    unsigned char ourCObj = cobj;
+    int values[9] = {posx, posy, posz, rotx, roty, rotz, sclx, scly, sclz};
+    memcpy(cubes[ourCObj], values, 9);
+}
+
+void renderlib3d_render(void){
+    // TODO: Draw the "cubes" array using their pos, rot and scl.
+}
+
+// End of section //
