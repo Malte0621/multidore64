@@ -410,7 +410,8 @@ void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, uns
 void renderlib_unload(void)
 {
     if (hasBeenInitialized == 0){
-        return initErrorMsg();
+        initErrorMsg();
+        return;
     }
     renderlib_setcolor(0x0E, 0x06);
     hasBeenInitialized = 0;
@@ -420,7 +421,8 @@ void renderlib_unload(void)
 void renderlib_init(void)
 {
     if (hasBeenInitialized == 1){
-        return initErrorMsg2();
+        initErrorMsg2();
+        return;
     }
     renderlib_clear();
     hasBeenInitialized = 1;
