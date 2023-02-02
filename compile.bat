@@ -48,7 +48,7 @@ if exist c64.cfg (
 :: Check if any "Error" were printed
 if not exist ../dist/main.d64 (
     :: Print the error message
-    echo Build failed.
+    echo Build failed!
     :: Exit with error code
     exit /b 1
 )
