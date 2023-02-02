@@ -472,8 +472,8 @@ void renderlib3d_init(void){
 }
 
 void renderlib3d_drawcube(int posx, int posy, int posz, int rotx, int roty, int rotz, int sclx, int scly, int sclz, unsigned char color){
-    cobj++;
     int values[9];
+    cobj++;
     values[0] = posx;
     values[1] = posy;
     values[2] = posz;
