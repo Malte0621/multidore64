@@ -473,7 +473,6 @@ void renderlib3d_init(void){
 
 void renderlib3d_drawcube(int posx, int posy, int posz, int rotx, int roty, int rotz, int sclx, int scly, int sclz, unsigned char color){
     cobj++;
-    unsigned char ourCObj = cobj;
     int values[9];
     values[0] = posx;
     values[1] = posy;
@@ -484,7 +483,7 @@ void renderlib3d_drawcube(int posx, int posy, int posz, int rotx, int roty, int 
     values[6] = sclx;
     values[7] = scly;
     values[8] = sclz;
-    memcpy(cubes[ourCObj], values, 9);
+    memcpy(cubes[cobj], values, 9);
 }
 
 void renderlib3d_render(void){
