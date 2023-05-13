@@ -27,10 +27,10 @@ int sin_table[TABLE_SIZE] = {0, 6, 13, 19, 25, 31, 38, 44, 50, 56, 63, 69, 75, 8
 int cos(int angle)
 {
     // Normalize the angle to be within the range of 0 to 359 degrees
-    angle = angle % 360;
+    angle = angle % TABLE_SIZE;
     if (angle < 0)
     {
-        angle += 360;
+        angle += TABLE_SIZE;
     }
 
     // Return the cosine value from the lookup table
@@ -40,10 +40,10 @@ int cos(int angle)
 int sin(int angle)
 {
     // Normalize the angle to be within the range of 0 to 359 degrees
-    angle = angle % 360;
+    angle = angle % TABLE_SIZE;
     if (angle < 0)
     {
-        angle += 360;
+        angle += TABLE_SIZE;
     }
 
     // Return the sine value from the lookup table
