@@ -30,4 +30,23 @@ void renderlib_fillrect(unsigned char x, unsigned char y, unsigned char w, unsig
 void renderlib_fillsphere(unsigned char x, unsigned char y, unsigned char r, unsigned char color); // Fill a sphere
 void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char* sprite); // Draw a sprite
 
+#ifdef RENDERLIB3D_INCLUDED
+void renderlib3d_setcpos(int x, int y, int z);
+void renderlib3d_setcrot(int x, int y, int z);
+void renderlib3d_setcscl(int x, int y, int z);
+
+void renderlib3d_clear();
+void renderlib3d_reset();
+void renderlib3d_init(void);
+
+unsigned char renderlib3d_draw(unsigned char shape, int posx, int posy, int posz, int rotx, int roty, int rotz, int sclx, int scly, int sclz, unsigned char color);
+
+void renderlib3d_setpos(unsigned char obj, int x, int y, int z);
+void renderlib3d_setrot(unsigned char obj, int x, int y, int z);
+void renderlib3d_setscl(unsigned char obj, int x, int y, int z);
+void renderlib3d_setshape(unsigned char obj, unsigned char shape);
+
+void renderlib3d_render(void);
+#endif
+
 #endif

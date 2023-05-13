@@ -431,6 +431,7 @@ void renderlib_init(void)
     renderlib_setcolor(0, 0);
 }
 
+#ifdef RENDERLIB3D_INCLUDED
 // RenderLib 3D Implementation //
 
 int cpos[3] = {0, 0, 0};
@@ -462,7 +463,7 @@ unsigned char cobj = 0;
 #define MAX_OBJECTS 32
 // unsigned char changeObjects[MAX_OBJECTS]; // Objects that have changed and need to be redrawn.
 unsigned char redrawRequired = 0; // If 1, redraw all objects.
-int objects[MAX_OBJECTS][11]; // TODO: Maybe increase or dynamiclly allocate somehow?
+int objects[MAX_OBJECTS][11];     // TODO: Maybe increase or dynamiclly allocate somehow?
 
 void renderlib3d_clear()
 {
@@ -474,11 +475,12 @@ void renderlib3d_clear()
     {
         memset(objects[i], 0, 44); // objects[11] --> 11 --> 11 * 4 (int) = 44
     }
-    
+
     redrawRequired = 1;
 }
 
-void renderlib3d_reset(){
+void renderlib3d_reset()
+{
     renderlib3d_clear();
     renderlib3d_setcpos(0, 0, 0);
     renderlib3d_setcrot(0, 0, 0);
@@ -562,14 +564,14 @@ void renderlib3d_render(void)
     {
         return;
     }
-    
-    int* obj;
+
+    int *obj;
     unsigned char shape;
     int posx, posy, posz;
     int rotx, roty, rotz;
     int sclx, scly, sclz;
     unsigned char color;
-    
+
     // Loop through all objects
     unsigned char i;
     for (i = 0; i < cobj; i++)
@@ -638,3 +640,4 @@ void renderlib3d_render(void)
 }
 
 // End of section //
+#endif
