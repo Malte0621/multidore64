@@ -9,7 +9,7 @@ MultiDore 64 - A decent game engine for the commodore 64!
 */
 
 #include <stdio.h>
-#include <stdlib.h>T
+#include <stdlib.h>
 #include <string.h>
 #include "multidore64/config.h"
 #include "multidore64/renderlib.h"
