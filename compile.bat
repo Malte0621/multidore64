@@ -4,14 +4,17 @@ rmdir /s /q build
 rmdir /s /q dist
 mkdir build 2>nul
 cd src
-:: Loop through all .c files in the current directory
-for %%f in (*.c) do (
+:: Loop through all .c files in the current directory and subdirectories
+for /r %%F in (*.c) do (
     :: Compile each .c file into a .s file
-    cc65 -O -o ../build/%%f.s -t c64 %%f
+    set filename=%%~nxF
+    cc65 -O -o ..\build\!filename!.s -t c64 %%F
 )
-for %%F in (*.s) do (
+
+for /r %%F in (*.s) do (
     :: Copy each .s file into the build directory
-    copy %%F ..\build\%%F
+    set filename=%%~nxF
+    copy %%F ..\build\!filename!
 )
 for %%F in (*.bin) do (
     :: Copy each .bin file into the build directory
@@ -54,5 +57,3 @@ if not exist ../dist/main.d64 (
 )
 :: Print the success message
 echo Build succeeded.
-
-pause
