@@ -107,7 +107,7 @@ int main(void)
         handleInput(0);
         // handleInput(1);
 
-        if (timeLeft > 0)
+        if (timeLeft > 0 && ticks % 750 == 0)
         {
             timeLeft--;
         }
