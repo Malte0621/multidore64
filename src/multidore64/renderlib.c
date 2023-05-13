@@ -13,6 +13,7 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include <conio.h>
 #include <string.h>
 #include <peekpoke.h>
+#include "config.h"
 #include "renderlib.h"
 
 char hasBeenInitialized = 0;
@@ -560,11 +561,6 @@ void renderlib3d_setshape(unsigned char obj, unsigned char shape)
 
 void renderlib3d_render(void)
 {
-    if (!redrawRequired)
-    {
-        return;
-    }
-
     int *obj;
     unsigned char shape;
     int posx, posy, posz;
@@ -574,6 +570,12 @@ void renderlib3d_render(void)
 
     // Loop through all objects
     unsigned char i;
+
+    if (!redrawRequired)
+    {
+        return;
+    }
+
     for (i = 0; i < cobj; i++)
     {
         // Get the object
@@ -599,38 +601,47 @@ void renderlib3d_render(void)
         switch (shape)
         {
         case 0: // Cube
-            renderlib_drawline(posx, posy, posz, posx + sclx, posy, posz, color);
-            renderlib_drawline(posx, posy, posz, posx, posy + scly, posz, color);
-            renderlib_drawline(posx, posy, posz, posx, posy, posz + sclz, color);
-            renderlib_drawline(posx + sclx, posy, posz, posx + sclx, posy + scly, posz, color);
-            renderlib_drawline(posx + sclx, posy, posz, posx + sclx, posy, posz + sclz, color);
-            renderlib_drawline(posx, posy + scly, posz, posx + sclx, posy + scly, posz, color);
-            renderlib_drawline(posx, posy + scly, posz, posx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx, posy, posz + sclz, posx + sclx, posy, posz + sclz, color);
-            renderlib_drawline(posx, posy, posz + sclz, posx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx + sclx, posy + scly, posz, posx + sclx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx + sclx, posy + scly, posz, posx + sclx, posy, posz + sclz, color);
-            renderlib_drawline(posx, posy + scly, posz + sclz, posx + sclx, posy + scly, posz + sclz, color);
+            // void renderlib_drawline(unsigned char x1, unsigned char y1, unsigned char x2, unsigned char y2, unsigned char thickness, unsigned char color)
+            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
+            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
+            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
+            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
 
-            renderlib_drawline(posx, posy, posz, posx + sclx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx, posy, posz, posx + sclx, posy, posz + sclz, color);
-            renderlib_drawline(posx, posy, posz, posx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx + sclx, posy, posz, posx + sclx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
+            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
+            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
+            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
 
-            renderlib_drawline(posx, posy + scly, posz, posx + sclx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx, posy + scly, posz, posx, posy, posz + sclz, color);
+            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
+            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
+            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
+            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
 
-            renderlib_drawline(posx + sclx, posy, posz, posx + sclx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx + sclx, posy, posz, posx, posy, posz + sclz, color);
+            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
+            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
+            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
+            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
 
-            renderlib_drawline(posx, posy, posz + sclz, posx + sclx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx, posy, posz + sclz, posx, posy + scly, posz, color);
+            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
+            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
+            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
+            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
 
-            renderlib_drawline(posx + sclx, posy + scly, posz, posx, posy + scly, posz + sclz, color);
-            renderlib_drawline(posx + sclx, posy + scly, posz, posx, posy, posz + sclz, color);
+            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
+            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
+            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
+            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
 
-            renderlib_drawline(posx + sclx, posy, posz + sclz, posx, posy + scly, posz, color);
-            renderlib_drawline(posx + sclx, posy, posz + sclz, posx, posy, posz, color);
+            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
+            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
+            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
+            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+
+            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
+            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
+            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
+            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+            
             break;
         default:
             //
