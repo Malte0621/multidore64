@@ -42,14 +42,14 @@ for %%f in (*.o) do (
 : Check if c64.cfg exist in the build directory
 if exist c64.cfg (
     :: Link all .o files into a .prg file
-    ld65 -C c64.cfg -o ../dist/main.d64 %files% c64.lib
+    ld65 -C c64.cfg -o ../dist/main.prg %files% c64.lib
 ) else (
     :: Link all .o files into a .prg file
-    ld65 -o ../dist/main.d64 -t c64 %files% c64.lib
+    ld65 -o ../dist/main.prg -t c64 %files% c64.lib
 )
 
 :: Check if any "Error" were printed
-if not exist ../dist/main.d64 (
+if not exist ../dist/main.prg (
     :: Print the error message
     echo Build failed!
     :: Exit with error code
