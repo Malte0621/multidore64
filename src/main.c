@@ -23,35 +23,6 @@ char max_x = 39, max_y = 24;
 
 extern char SIDFILE[];
 
-void replaceColor(unsigned char color, unsigned char color2)
-{
-    unsigned char x;
-    unsigned char y;
-    for (x = 0; x < 40; x++)
-    {
-        for (y = 0; y < 25; y++)
-        {
-            if (renderlib_getpixel(x, y) == color)
-            {
-                draw(x, y, color2);
-            }
-        }
-    }
-}
-
-void findAndFloodFill(unsigned char x, unsigned char y, unsigned char color, unsigned char stopColor)
-{
-    unsigned char cx;
-    unsigned char cy;
-    // Get the center of the shape
-    if (renderlib_findcenter(x, y, &cx, &cy))
-    {
-        // Flood fill the shape
-        renderlib_floodfill(cx, cy, color, stopColor);
-    }
-    replaceColor(stopColor, color);
-}
-
 void handleInput(unsigned char port)
 {
 }
@@ -60,8 +31,6 @@ int main(void)
 {
     char debug = 1;
     int timeLeft = 240;
-    int i;
-    int j;
     long ticks;
 
     renderlib_init();
