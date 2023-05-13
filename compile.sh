@@ -60,13 +60,13 @@ done
 # Check if c64.cfg exists in the current directory
 if [ -f c64.cfg ]; then
     # Link all .o files into a .prg file
-    ld65 -C c64.cfg -o ../dist/main.d64 $obj_files c64.lib
+    ld65 -C c64.cfg -o ../dist/main.prg $obj_files c64.lib
 else
     # Link all .o files into a .prg file
-    ld65 -o ../dist/main.d64 -t c64 $obj_files c64.lib
+    ld65 -o ../dist/main.prg -t c64 $obj_files c64.lib
 fi
 
-if [ -f ../dist/main.d64 ]; then
+if [ -f ../dist/main.prg ]; then
     # Print a success message
     echo "Build successful!"
     # Exit with a success code
