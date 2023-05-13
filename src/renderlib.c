@@ -409,7 +409,8 @@ void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, uns
 
 void renderlib_unload(void)
 {
-    if (hasBeenInitialized == 0){
+    if (hasBeenInitialized == 0)
+    {
         initErrorMsg();
         return;
     }
@@ -420,7 +421,8 @@ void renderlib_unload(void)
 
 void renderlib_init(void)
 {
-    if (hasBeenInitialized == 1){
+    if (hasBeenInitialized == 1)
+    {
         initErrorMsg2();
         return;
     }
@@ -431,63 +433,208 @@ void renderlib_init(void)
 
 // RenderLib 3D Implementation //
 
-int cpos[3] = {0,0,0};
-int crot[3] = {0,0,0};
-int cscl[3] = {5,5,15}; // 10 = 1m
+int cpos[3] = {0, 0, 0};
+int crot[3] = {0, 0, 0};
+int cscl[3] = {5, 5, 15}; // 10 = 1m
 
-void renderlib3d_setcpos(int x, int y, int z){
+void renderlib3d_setcpos(int x, int y, int z)
+{
     cpos[0] = x;
     cpos[1] = y;
     cpos[2] = z;
 }
 
-void renderlib3d_setcrot(int x, int y, int z){
+void renderlib3d_setcrot(int x, int y, int z)
+{
     crot[0] = x;
     crot[1] = y;
     crot[2] = z;
 }
 
-void renderlib3d_setcscl(int x, int y, int z){
+void renderlib3d_setcscl(int x, int y, int z)
+{
     cscl[0] = x;
     cscl[1] = y;
     cscl[2] = z;
 }
 
 unsigned char cobj = 0;
-int cubes[32][9]; // TODO: Maybe increase or dynamiclly allocate somehow?
+#define MAX_OBJECTS 32
+// unsigned char changeObjects[MAX_OBJECTS]; // Objects that have changed and need to be redrawn.
+unsigned char redrawRequired = 0; // If 1, redraw all objects.
+int objects[MAX_OBJECTS][11]; // TODO: Maybe increase or dynamiclly allocate somehow?
 
-void renderlib3d_init(void){
+void renderlib3d_clear()
+{
     unsigned char i;
-    if (hasBeenInitialized == 0){
-        renderlib_init();
-    } 
+
     // Default values reset //
-    for (i = 0; i < 255; i++){
-        memset(cubes[i], 0, 9);
-    }
     cobj = 0;
-    renderlib3d_setcpos(0,0,0);
-    renderlib3d_setcrot(0,0,0);
-    renderlib3d_setcscl(5,5,15);
+    for (i = 0; i < MAX_OBJECTS; i++)
+    {
+        memset(objects[i], 0, 44); // objects[11] --> 11 --> 11 * 4 (int) = 44
+    }
+    
+    redrawRequired = 1;
 }
 
-void renderlib3d_drawcube(int posx, int posy, int posz, int rotx, int roty, int rotz, int sclx, int scly, int sclz, unsigned char color){
-    int values[9];
+void renderlib3d_reset(){
+    renderlib3d_clear();
+    renderlib3d_setcpos(0, 0, 0);
+    renderlib3d_setcrot(0, 0, 0);
+    renderlib3d_setcscl(5, 5, 15);
+}
+
+void renderlib3d_init(void)
+{
+    if (hasBeenInitialized == 0)
+    {
+        renderlib_init();
+    }
+}
+
+/*
+SHAPES:
+0 = Cube
+1 = Pyramid (WIP)
+2 = Sphere (WIP)
+3 = Cylinder (WIP)
+4 = Cone (WIP)
+5 = Plane (WIP)
+*/
+unsigned char renderlib3d_draw(unsigned char shape, int posx, int posy, int posz, int rotx, int roty, int rotz, int sclx, int scly, int sclz, unsigned char color)
+{
+    int values[10];
     cobj++;
-    values[0] = posx;
-    values[1] = posy;
-    values[2] = posz;
-    values[3] = rotx;
-    values[4] = roty;
-    values[5] = rotz;
-    values[6] = sclx;
-    values[7] = scly;
-    values[8] = sclz;
-    memcpy(cubes[cobj], values, 9);
+    values[0] = shape; // TODO: Can we reduce the amount of bytes used for this? (Maybe 1 byte for shape somehow? (instead of 4))
+    values[1] = posx;
+    values[2] = posy;
+    values[3] = posz;
+    values[4] = rotx;
+    values[5] = roty;
+    values[6] = rotz;
+    values[7] = sclx;
+    values[8] = scly;
+    values[9] = sclz;
+    values[10] = color;
+    memcpy(objects[cobj], values, 9);
+    return cobj;
 }
 
-void renderlib3d_render(void){
-    // TODO: Draw the "cubes" array using their pos, rot and scl.
+void enqueue_redraw(unsigned char obj)
+{
+    redrawRequired = 1;
+}
+
+void renderlib3d_setpos(unsigned char obj, int x, int y, int z)
+{
+    objects[obj][1] = x;
+    objects[obj][2] = y;
+    objects[obj][3] = z;
+    enqueue_redraw(obj);
+}
+
+void renderlib3d_setrot(unsigned char obj, int x, int y, int z)
+{
+    objects[obj][4] = x;
+    objects[obj][5] = y;
+    objects[obj][6] = z;
+    enqueue_redraw(obj);
+}
+
+void renderlib3d_setscl(unsigned char obj, int x, int y, int z)
+{
+    objects[obj][7] = x;
+    objects[obj][8] = y;
+    objects[obj][9] = z;
+    enqueue_redraw(obj);
+}
+
+void renderlib3d_setshape(unsigned char obj, unsigned char shape)
+{
+    objects[obj][0] = shape;
+    enqueue_redraw(obj);
+}
+
+void renderlib3d_render(void)
+{
+    if (!redrawRequired)
+    {
+        return;
+    }
+    
+    int* obj;
+    unsigned char shape;
+    int posx, posy, posz;
+    int rotx, roty, rotz;
+    int sclx, scly, sclz;
+    unsigned char color;
+    
+    // Loop through all objects
+    unsigned char i;
+    for (i = 0; i < cobj; i++)
+    {
+        // Get the object
+        obj = objects[i];
+        // Get the shape
+        shape = obj[0];
+        // Get the position
+        posx = obj[1];
+        posy = obj[2];
+        posz = obj[3];
+        // Get the rotation
+        rotx = obj[4];
+        roty = obj[5];
+        rotz = obj[6];
+        // Get the scale
+        sclx = obj[7];
+        scly = obj[8];
+        sclz = obj[9];
+        // Get the color
+        color = obj[10];
+
+        // Draw it!
+        switch (shape)
+        {
+        case 0: // Cube
+            renderlib_drawline(posx, posy, posz, posx + sclx, posy, posz, color);
+            renderlib_drawline(posx, posy, posz, posx, posy + scly, posz, color);
+            renderlib_drawline(posx, posy, posz, posx, posy, posz + sclz, color);
+            renderlib_drawline(posx + sclx, posy, posz, posx + sclx, posy + scly, posz, color);
+            renderlib_drawline(posx + sclx, posy, posz, posx + sclx, posy, posz + sclz, color);
+            renderlib_drawline(posx, posy + scly, posz, posx + sclx, posy + scly, posz, color);
+            renderlib_drawline(posx, posy + scly, posz, posx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx, posy, posz + sclz, posx + sclx, posy, posz + sclz, color);
+            renderlib_drawline(posx, posy, posz + sclz, posx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx + sclx, posy + scly, posz, posx + sclx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx + sclx, posy + scly, posz, posx + sclx, posy, posz + sclz, color);
+            renderlib_drawline(posx, posy + scly, posz + sclz, posx + sclx, posy + scly, posz + sclz, color);
+
+            renderlib_drawline(posx, posy, posz, posx + sclx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx, posy, posz, posx + sclx, posy, posz + sclz, color);
+            renderlib_drawline(posx, posy, posz, posx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx + sclx, posy, posz, posx + sclx, posy + scly, posz + sclz, color);
+
+            renderlib_drawline(posx, posy + scly, posz, posx + sclx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx, posy + scly, posz, posx, posy, posz + sclz, color);
+
+            renderlib_drawline(posx + sclx, posy, posz, posx + sclx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx + sclx, posy, posz, posx, posy, posz + sclz, color);
+
+            renderlib_drawline(posx, posy, posz + sclz, posx + sclx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx, posy, posz + sclz, posx, posy + scly, posz, color);
+
+            renderlib_drawline(posx + sclx, posy + scly, posz, posx, posy + scly, posz + sclz, color);
+            renderlib_drawline(posx + sclx, posy + scly, posz, posx, posy, posz + sclz, color);
+
+            renderlib_drawline(posx + sclx, posy, posz + sclz, posx, posy + scly, posz, color);
+            renderlib_drawline(posx + sclx, posy, posz + sclz, posx, posy, posz, color);
+            break;
+        default:
+            //
+            break;
+        }
+    }
 }
 
 // End of section //

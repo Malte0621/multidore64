@@ -239,7 +239,9 @@ void handleInput(unsigned char port)
                 p1_nd++;
             }
             return;
-        }else{
+        }
+        else
+        {
             p1_nd = 0;
         }
         if (isCollidingWith(prevX, prevY, 0))
@@ -337,7 +339,9 @@ void handleInput(unsigned char port)
                 p2_nd++;
             }
             return;
-        }else{
+        }
+        else
+        {
             p2_nd = 0;
         }
         if (isCollidingWith(prevX, prevY, 0))
@@ -414,10 +418,11 @@ int main(void)
     // Game Loop
     while (1)
     {
-        if (debug){
-            char *timeLeftStr = malloc(100);
-            char *p1state = malloc(100);
-            char *p1nd = malloc(50);
+        if (debug)
+        {
+            char *timeLeftStr = malloc(24);
+            char *p1state = malloc(20);
+            char *p1nd = malloc(16);
 
             sprintf(timeLeftStr, "time left: %i", timeLeft);
             renderlib_drawstring(0, 1, color_white, timeLeftStr);
