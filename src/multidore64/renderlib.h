@@ -10,7 +10,12 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #ifndef RENDERLIB_H
 #define RENDERLIB_H
 
+unsigned short get_renderlib_screen_width();
+unsigned short get_renderlib_screen_height();
+
 void sleep(unsigned int ms);
+int cos(int angle);
+int sin(int angle);
 
 void renderlib_init(); // Initialize the renderlib
 void renderlib_unload(); // Unload the renderlib
@@ -27,8 +32,13 @@ void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color,
 
 void renderlib_drawline(unsigned char x1, unsigned char y1, unsigned char x2, unsigned char y2, unsigned char thickness, unsigned char color); // Draw a line
 void renderlib_fillrect(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char color); // Fill a rectangle
-void renderlib_fillsphere(unsigned char x, unsigned char y, unsigned char r, unsigned char color); // Fill a sphere
+void renderlib_fillcircle(unsigned char x, unsigned char y, unsigned char r, unsigned char color); // Fill a sphere
 void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char* sprite); // Draw a sprite
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+void renderlib_setmode(unsigned char state);
+void renderlib_draw();
+#endif
 
 #ifdef RENDERLIB3D_INCLUDED
 void renderlib3d_setcpos(int x, int y, int z);
@@ -37,7 +47,7 @@ void renderlib3d_setcscl(int x, int y, int z);
 
 void renderlib3d_clear();
 void renderlib3d_reset();
-void renderlib3d_init(void);
+void renderlib3d_init();
 
 unsigned char renderlib3d_draw(unsigned char shape, int posx, int posy, int posz, int rotx, int roty, int rotz, int sclx, int scly, int sclz, unsigned char color);
 
@@ -46,7 +56,7 @@ void renderlib3d_setrot(unsigned char obj, int x, int y, int z);
 void renderlib3d_setscl(unsigned char obj, int x, int y, int z);
 void renderlib3d_setshape(unsigned char obj, unsigned char shape);
 
-void renderlib3d_render(void);
+void renderlib3d_render();
 #endif
 
 #endif

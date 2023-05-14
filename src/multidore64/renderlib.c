@@ -13,13 +13,53 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include <conio.h>
 #include <string.h>
 #include <peekpoke.h>
+#include <cbm.h>
 #include "config.h"
 #include "renderlib.h"
+#include <tgi.h>
+// #include "colorlib.h"
+
+#define BASE 0x3c00 // 8192
+
+const unsigned char color_black1 = 0x00;
+const unsigned char color_white1 = 0x01;
+const unsigned char color_light_blue1 = 0x0E;
+const unsigned char color_blue1 = 0x06;
+
+unsigned short renderlib_screen_width = 40, renderlib_screen_height = 25;
 
 char hasBeenInitialized = 0;
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+unsigned char renderMode = 0;
 
-unsigned char modeByte1;
-unsigned char modeByte2;
+const unsigned char renderlib_mode_text = 0;
+const unsigned char renderlib_mode_graphics = 1;
+
+unsigned char drawPage = 0;
+#endif
+
+unsigned short get_renderlib_screen_width()
+{
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        return tgi_getmaxx();
+    }
+#endif
+
+    return renderlib_screen_width;
+}
+
+unsigned short get_renderlib_screen_height()
+{
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        return tgi_getmaxy();
+    }
+#endif
+    return renderlib_screen_height;
+}
 
 #define TABLE_SIZE 360
 int cos_table[TABLE_SIZE] = {1000, 999, 998, 997, 995, 994, 992, 990, 988, 986, 984, 982, 980, 978, 975, 973, 970, 968, 965, 962, 960, 957, 954, 951, 948, 945, 942, 939, 936, 933, 930, 927, 923, 920, 917, 913, 910, 906, 903, 899, 896, 892, 888, 885, 881, 877, 873, 869, 865, 861, 857, 853, 849, 845, 841, 837, 833, 829, 825, 821, 817, 813, 808, 804, 800, 796, 791, 787, 783, 778, 774, 769, 765, 760, 756, 751, 747, 742, 738, 733, 729, 724, 719, 715, 710, 705, 701, 696, 691, 687, 682, 677, 672, 668, 663, 658, 653, 648, 643, 639, 634, 629, 624, 619, 614, 609, 604, 599, 594, 589, 584, 579, 574, 569, 564, 559, 554, 549, 544, 539, 534, 529, 524, 519, 514, 509, 504, 499, 494, 489, 484, 479, 474, 469, 464, 459, 454, 449, 444, 439, 434, 429, 424, 419, 414, 409, 404, 399, 394, 389, 384, 379, 374, 369, 364, 359, 354, 349, 344, 339, 334, 329, 324, 319, 314, 309, 304, 299, 294, 289, 284, 279, 274, 269, 264, 259, 254, 249, 244, 239, 234, 229, 224, 219, 214, 209, 204, 199, 194, 189, 184, 179, 174, 169, 164, 159, 154, 149, 144, 139, 134, 129, 124, 119, 114, 109, 104, 99, 94, 89, 84, 79, 74, 69, 64, 59, 54, 49, 44, 39, 34, 29, 24, 19, 14, 9, 4, 0, -4, -9, -14, -19, -24, -29, -34, -39, -44, -49, -54, -59, -64, -69, -74, -79, -84, -89, -94, -99, -104, -109, -114, -119, -124, -129, -134, -139, -144, -149, -154, -159, -164, -169, -174, -179, -184, -189, -194, -199, -204, -209, -214, -219, -224, -229, -234, -239, -244, -249, -254, -259, -264, -269, -274, -279, -284, -289, -294, -299, -304, -309, -314, -319, -324, -329, -334, -339, -344, -349, -354, -359, -364, -369, -374, -379, -384, -389, -394, -399, -404, -409, -414, -419, -424, -429, -434, -439, -444, -449, -454, -459, -464, -469, -474, -479, -484, -489, -494, -499, -504, -509, -514, -519, -524, -529, -534, -539, -544, -549, -554, -559, -564, -569, -574, -579, -584, -589, -594, -599, -604, -609, -614, -619, -624, -629, -634, -639, -643, -648, -653, -658};
@@ -75,7 +115,7 @@ void initErrorMsg2()
     msg("Renderlib has already been initialized!");
 }
 
-void renderlib_clear(void)
+void renderlib_clear()
 {
     unsigned char color = PEEK(53280);
     if (hasBeenInitialized == 0)
@@ -83,20 +123,68 @@ void renderlib_clear(void)
         printf("%c", 0x93);
         return;
     }
-    renderlib_fillrect(0, 0, 39, 23, color);
-}
-
-void renderlib_toggle_rendering(char state)
-{
-    if (state == 0)
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
     {
-        // Disable rendering
+        tgi_clear();
     }
     else
     {
-        // Enable rendering
+#endif
+
+        renderlib_fillrect(0, 0, 39, 23, color);
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    }
+#endif
+}
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+void renderlib_draw()
+{
+    if (hasBeenInitialized == 0)
+    {
+        initErrorMsg();
+        return;
+    }
+
+    if (renderMode == renderlib_mode_graphics)
+    {
+        drawPage = !drawPage;
+        tgi_setdrawpage(drawPage);
+        tgi_setviewpage(!drawPage);
     }
 }
+
+void renderlib_setmode(unsigned char state)
+{
+    if (state == 0)
+    {
+        // Revert to text mode
+        tgi_uninstall();
+        tgi_unload();
+
+        renderlib_screen_width = 40;
+        renderlib_screen_height = 25;
+    }
+    else
+    {
+        // Enter graphics mode
+        tgi_install(tgi_static_stddrv);
+        tgi_init();
+        tgi_clear();
+
+        tgi_setdrawpage(drawPage);
+        tgi_setviewpage(!drawPage);
+
+        // renderlib_setcolor(color_black1, color_white1);
+
+        renderlib_screen_width = tgi_getxres();
+        renderlib_screen_height = tgi_getyres();
+    }
+    renderMode = state;
+}
+#endif
 
 void renderlib_setcolor(unsigned char background, unsigned char foreground)
 {
@@ -113,6 +201,12 @@ void renderlib_setcolor(unsigned char background, unsigned char foreground)
 
 void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color, unsigned char c)
 {
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    unsigned char *c2 = malloc(2);
+    c2[0] = c;
+    c2[1] = '\0';
+#endif
+
     if (hasBeenInitialized == 0)
     {
         initErrorMsg();
@@ -121,8 +215,35 @@ void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color, u
 
     // Set the color of the pixel at position (x, y) to the desired color
     POKE(55296 + y * 40 + x, color);
-    // Draw the character
-    POKE(1024 + y * 40 + x, c);
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        // Draw the character using pixels
+        /*
+        unsigned char i, j;
+        for (i = 0; i < 8; i++)
+        {
+            for (j = 0; j < 8; j++)
+            {
+                if ((font8x8_basic[c][i] >> j) & 1)
+                {
+                    renderlib_setpixel(x * 8 + j, y * 8 + i, color);
+                }
+            }
+        }
+        */
+        tgi_setcolor(color);
+        tgi_outtextxy(x, y, c2);
+    }
+    else
+    {
+#endif
+        // Draw the character
+        POKE(1024 + y * 40 + x, c);
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    }
+#endif
 }
 
 unsigned char renderlib_getchar(unsigned char x, unsigned char y)
@@ -132,6 +253,14 @@ unsigned char renderlib_getchar(unsigned char x, unsigned char y)
         initErrorMsg();
         return 0;
     }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        msg("Cannot get character in graphics mode!");
+        return 0;
+    }
+#endif
 
     // Get the character at position (x, y)
     return PEEK(1024 + y * 40 + x);
@@ -145,8 +274,29 @@ void renderlib_setpixel(unsigned char x, unsigned char y, unsigned char color)
         return;
     }
 
-    // Set the color of the pixel at position (x, y) to the desired color
-    renderlib_drawchar(x, y, color, 224);
+    if (x >= renderlib_screen_width || y >= renderlib_screen_height)
+        return;
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        // Set the color of the pixel at position (x, y) to the desired color
+        // POKE(55296 + y * 40 + x, color);
+        tgi_setcolor(color);
+        tgi_setpixel(x, y);
+        return;
+    }
+    else
+    {
+
+#endif
+
+        // Set the color of the pixel at position (x, y) to the desired color
+        renderlib_drawchar(x, y, color, 224);
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    }
+#endif
 }
 
 unsigned char renderlib_getpixel(unsigned char x, unsigned char y)
@@ -157,8 +307,21 @@ unsigned char renderlib_getpixel(unsigned char x, unsigned char y)
         return 0;
     }
 
-    // Get the color of the pixel at position (x, y)
-    return PEEK(55296 + y * 40 + x);
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        // Get the color of the pixel at position (x, y)
+        return tgi_getpixel(x, y);
+    }
+    else
+    {
+#endif
+
+        // Get the color of the pixel at position (x, y)
+        return PEEK(55296 + y * 40 + x);
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    }
+#endif
 }
 
 void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color, char *str)
@@ -167,6 +330,16 @@ void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color,
     unsigned char len = strlen(str);
     // Loop through the string
     unsigned char i = 0;
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        tgi_setcolor(color);
+        tgi_outtextxy(x, y, str);
+        return;
+    }
+#endif
+
     while (i < len)
     {
         // Draw the character
@@ -316,13 +489,28 @@ void renderlib_fillrect(unsigned char x, unsigned char y, unsigned char w, unsig
         return;
     }
 
-    for (i = 0; i < w; i++)
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
     {
-        for (j = 0; j < h; j++)
-        {
-            renderlib_setpixel(x + i, y + j, color);
-        }
+        // Draw a filled rectangle
+        tgi_setcolor(color);
+        tgi_bar(x, y, x + w, y + h);
     }
+    else
+    {
+#endif
+
+        for (i = 0; i < w; i++)
+        {
+            for (j = 0; j < h; j++)
+            {
+                renderlib_setpixel(x + i, y + j, color);
+            }
+        }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    }
+#endif
 }
 
 void renderlib_drawline(unsigned char x1, unsigned char y1, unsigned char x2, unsigned char y2, unsigned char thickness, unsigned char color)
@@ -347,22 +535,37 @@ void renderlib_drawline(unsigned char x1, unsigned char y1, unsigned char x2, un
         return;
     }
 
-    // Loop through the thickness
-    for (i = 0; i < t; i++)
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
     {
-        // Loop through the x-axis
-        for (j = 0; j < dx; j++)
-        {
-            // Calculate the y-axis
-            unsigned char y = m * j + y1;
-            // Draw the pixel
-            renderlib_setpixel(x1 + j, y + i, color);
-            renderlib_setpixel(x1 + j, y - i, color);
-        }
+        // Draw a line
+        tgi_setcolor(color);
+        tgi_line(x1, y1, x2, y2);
     }
+    else
+    {
+#endif
+
+        // Loop through the thickness
+        for (i = 0; i < t; i++)
+        {
+            // Loop through the x-axis
+            for (j = 0; j < dx; j++)
+            {
+                // Calculate the y-axis
+                unsigned char y = m * j + y1;
+                // Draw the pixel
+                renderlib_setpixel(x1 + j, y + i, color);
+                renderlib_setpixel(x1 + j, y - i, color);
+            }
+        }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    }
+#endif
 }
 
-void renderlib_fillsphere(unsigned char x, unsigned char y, unsigned char r, unsigned char color)
+void renderlib_fillcircle(unsigned char x, unsigned char y, unsigned char r, unsigned char color)
 {
     unsigned char i = 0;
     unsigned char j = 0;
@@ -388,6 +591,49 @@ void renderlib_fillsphere(unsigned char x, unsigned char y, unsigned char r, uns
     }
 }
 
+void renderlib_drawcirlce(unsigned char x, unsigned char y, unsigned char r, unsigned char color)
+{
+    unsigned char i = 0;
+    unsigned char j = 0;
+    int radiusSquared;
+
+    if (hasBeenInitialized == 0)
+    {
+        initErrorMsg();
+        return;
+    }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        // Draw a circle
+        tgi_setcolor(color);
+        tgi_circle(x, y, r);
+    }
+    else
+    {
+#endif
+
+        radiusSquared = r * r;
+        for (i = 0; i <= r; i++)
+        {
+            for (j = 0; j <= r; j++)
+            {
+                int distanceSquared = (i - r) * (i - r) + (j - r) * (j - r);
+                if (distanceSquared >= radiusSquared - 2 * r && distanceSquared <= radiusSquared + 2 * r)
+                {
+                    renderlib_setpixel(x + i, y + j, color);
+                    renderlib_setpixel(x - i, y + j, color);
+                    renderlib_setpixel(x + i, y - j, color);
+                    renderlib_setpixel(x - i, y - j, color);
+                }
+            }
+        }
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    }
+#endif
+}
+
 void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char *sprite)
 {
     unsigned char i = 0;
@@ -408,28 +654,35 @@ void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, uns
     }
 }
 
-void renderlib_unload(void)
+void renderlib_unload()
 {
     if (hasBeenInitialized == 0)
     {
         initErrorMsg();
         return;
     }
-    renderlib_setcolor(0x0E, 0x06);
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+    if (renderMode == renderlib_mode_graphics)
+    {
+        renderlib_setmode(renderlib_mode_text);
+    }
+#endif
+    renderlib_setcolor(color_light_blue1, color_blue1);
     hasBeenInitialized = 0;
     renderlib_clear();
 }
 
-void renderlib_init(void)
+void renderlib_init()
 {
     if (hasBeenInitialized == 1)
     {
         initErrorMsg2();
         return;
     }
+    // renderlib_setmode(renderlib_mode_text);
     renderlib_clear();
     hasBeenInitialized = 1;
-    renderlib_setcolor(0, 0);
+    renderlib_setcolor(color_black1, color_black1);
 }
 
 #ifdef RENDERLIB3D_INCLUDED
@@ -488,12 +741,15 @@ void renderlib3d_reset()
     renderlib3d_setcscl(5, 5, 15);
 }
 
-void renderlib3d_init(void)
+void renderlib3d_init()
 {
     if (hasBeenInitialized == 0)
     {
         renderlib_init();
     }
+    renderlib_setmode(renderlib_mode_graphics);
+
+    renderlib3d_reset();
 }
 
 /*
@@ -559,7 +815,7 @@ void renderlib3d_setshape(unsigned char obj, unsigned char shape)
     enqueue_redraw(obj);
 }
 
-void renderlib3d_render(void)
+void renderlib3d_render()
 {
     int *obj;
     unsigned char shape;
@@ -641,7 +897,7 @@ void renderlib3d_render(void)
             renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
             renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
             renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
-            
+
             break;
         default:
             //

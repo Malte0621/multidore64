@@ -11,14 +11,10 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "multidore64/config.h"
-#include "multidore64/renderlib.h"
-#include "multidore64/soundlib.h"
-#include "multidore64/colorlib.h"
-#include "multidore64/controllerlib.h"
+#include "multidore64/include.h"
 #include <conio.h>
 
-char max_x = 39, max_y = 24;
+unsigned short max_x, max_y;
 
 extern char SIDFILE[];
 
@@ -26,17 +22,24 @@ void handleInput(unsigned char port)
 {
 }
 
-int main(void)
+int main()
 {
+    unsigned int i;
+    unsigned int j;
+
     char debug = 1;
     int timeLeft = 240;
     long ticks;
+
+    max_x = get_renderlib_screen_width() - 1;
+    max_y = get_renderlib_screen_height() - 1;
 
     renderlib_init();
     soundlib_init();
     controller_init();
 
     sleep(50);
+    /*
     renderlib_drawstring(max_x / 2 - 16, max_y / 2, color_white, "press space/fire button to start");
     soundlib_play(SIDFILE);
     while (1)
@@ -48,7 +51,26 @@ int main(void)
     }
     soundlib_stop();
     renderlib_clear();
-    
+    */
+
+    renderlib_setmode(1);
+
+    // renderlib_fillrect(0, 0, get_renderlib_screen_width(), get_renderlib_screen_height(), color_red);
+    renderlib_fillcircle(0, 0, 50, color_red);
+    renderlib_drawstring(get_renderlib_screen_width() / 2, get_renderlib_screen_height() / 2, color_white, "Hello World!");
+    renderlib_draw();
+
+    while (1)
+    {
+        if (controller_ispressed(0x51)) // TODO: Correct this.
+        {
+            // if so, exit the program
+            break;
+        }
+        sleep(1);
+    }
+
+    /*
     renderlib3d_init();
 
     // Game Loop
@@ -87,6 +109,8 @@ int main(void)
         sleep(1);
         ticks++;
     }
+    */
+    
     renderlib_unload();
     return EXIT_SUCCESS;
 }
