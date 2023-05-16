@@ -19,6 +19,13 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include <tgi.h>
 // #include "colorlib.h"
 
+#define tgi_sprite(spr) tgi_ioctl(0, (void *)(spr))
+#define tgi_flip() tgi_ioctl(1, (void *)0)
+#define tgi_setbgcolor(bgcol) tgi_ioctl(2, (void *)(bgcol))
+#define tgi_setframerate(rate) tgi_ioctl(3, (void *)(rate))
+#define tgi_busy() tgi_ioctl(4, (void *)0)
+#define tgi_updatedisplay() tgi_ioctl(4, (void *)1)
+
 #define BASE 0x3c00 // 8192
 
 const unsigned char color_black1 = 0x00;
@@ -140,6 +147,30 @@ void renderlib_clear()
 }
 
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+/*
+Colors:
+0 = black
+1 = white
+2 = red
+3 = cyan
+4 = purple
+5 = green
+6 = blue
+7 = yellow
+8 = orange
+9 = brown
+10 = light red
+11 = dark grey
+12 = grey
+13 = light green
+14 = light blue
+15 = light grey
+*/
+// The lower 4 bits represent the color intensity of the blue channel, the next 3 bits represent the color intensity of the green channel, and the highest bit represents the color intensity of the red channel.
+const unsigned char tgi_static_palette[] = {
+    0x00, 0xff, 0x02, 0x03, 0x04, 0x05, 0x06, 0x0e,
+    0x08, 0x10, 0x0c, 0x1c, 0x0e, 0x14, 0x19, 0x1f};
+
 void renderlib_draw()
 {
     if (hasBeenInitialized == 0)
@@ -150,9 +181,14 @@ void renderlib_draw()
 
     if (renderMode == renderlib_mode_graphics)
     {
+        while (tgi_busy())
+        {
+            sleep(1);
+        }
         drawPage = !drawPage;
         tgi_setdrawpage(drawPage);
         tgi_setviewpage(!drawPage);
+        tgi_updatedisplay();
     }
 }
 
@@ -172,10 +208,13 @@ void renderlib_setmode(unsigned char state)
         // Enter graphics mode
         tgi_install(tgi_static_stddrv);
         tgi_init();
+        tgi_setpalette(tgi_static_palette);
         tgi_clear();
 
         tgi_setdrawpage(drawPage);
         tgi_setviewpage(!drawPage);
+
+        tgi_updatedisplay();
 
         // renderlib_setcolor(color_black1, color_white1);
 
@@ -199,13 +238,19 @@ void renderlib_setcolor(unsigned char background, unsigned char foreground)
     POKE(53281, foreground);
 }
 
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+#include "font8x8_basic.h"
+#endif
+
 void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color, unsigned char c)
 {
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    unsigned char *c2 = malloc(2);
-    c2[0] = c;
-    c2[1] = '\0';
-#endif
+    /*
+    #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+        char *c2 = malloc(2);
+        c2[0] = c;
+        c2[1] = '\0';
+    #endif
+    */
 
     if (hasBeenInitialized == 0)
     {
@@ -214,13 +259,11 @@ void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color, u
     }
 
     // Set the color of the pixel at position (x, y) to the desired color
-    POKE(55296 + y * 40 + x, color);
 
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
     if (renderMode == renderlib_mode_graphics)
     {
         // Draw the character using pixels
-        /*
         unsigned char i, j;
         for (i = 0; i < 8; i++)
         {
@@ -232,14 +275,14 @@ void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color, u
                 }
             }
         }
-        */
-        tgi_setcolor(color);
-        tgi_outtextxy(x, y, c2);
+        // tgi_setcolor(color);
+        // tgi_outtextxy(x, y, c2);
     }
     else
     {
 #endif
         // Draw the character
+        POKE(55296 + y * 40 + x, color);
         POKE(1024 + y * 40 + x, c);
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
     }
@@ -274,7 +317,7 @@ void renderlib_setpixel(unsigned char x, unsigned char y, unsigned char color)
         return;
     }
 
-    if (x >= renderlib_screen_width || y >= renderlib_screen_height)
+    if (x >= get_renderlib_screen_width() || y >= get_renderlib_screen_height())
         return;
 
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
@@ -324,21 +367,27 @@ unsigned char renderlib_getpixel(unsigned char x, unsigned char y)
 #endif
 }
 
-void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color, char *str)
+void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color, const char *str2)
 {
+    char *str = malloc(10); // DEBUG
+
     // Get the length of the string
     unsigned char len = strlen(str);
     // Loop through the string
     unsigned char i = 0;
 
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        tgi_setcolor(color);
-        tgi_outtextxy(x, y, str);
-        return;
-    }
-#endif
+    sprintf(str, "%d", tgi_getmaxcolor()); // DEBUG
+
+    /*
+    #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+        if (renderMode == renderlib_mode_graphics)
+        {
+            tgi_setcolor(color);
+            tgi_outtextxy(x, y, str);
+            return;
+        }
+    #endif
+    */
 
     while (i < len)
     {

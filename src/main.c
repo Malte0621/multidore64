@@ -55,9 +55,9 @@ int main()
 
     renderlib_setmode(1);
 
-    // renderlib_fillrect(0, 0, get_renderlib_screen_width(), get_renderlib_screen_height(), color_red);
-    renderlib_fillcircle(0, 0, 50, color_red);
-    renderlib_drawstring(get_renderlib_screen_width() / 2, get_renderlib_screen_height() / 2, color_white, "Hello World!");
+    // renderlib_fillrect(0, 0, 50, 20, color_red);
+    // renderlib_fillcircle(get_renderlib_screen_width() / 2, get_renderlib_screen_height() / 2, 50, color_green);
+    renderlib_drawstring(get_renderlib_screen_width() / 2, 0, color_blue, "Hello World!");
     renderlib_draw();
 
     while (1)
