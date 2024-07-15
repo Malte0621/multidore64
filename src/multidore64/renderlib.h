@@ -10,8 +10,6 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #ifndef RENDERLIB_H
 #define RENDERLIB_H
 
-void sleep(unsigned int ms);
-
 void renderlib_init(); // Initialize the renderlib
 void renderlib_unload(); // Unload the renderlib
 void renderlib_clear(); // Clear the screen

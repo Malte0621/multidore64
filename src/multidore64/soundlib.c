@@ -13,6 +13,7 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include "soundlib.h"
 #include <c64.h>
 #include <peekpoke.h>
+#include "utilslib.h"
 
 struct SIDHeader
 {
@@ -62,25 +63,6 @@ void soundlib_play(char FILEDATA[]){
 	memcpy((void*)(SIDLOAD),(void*)FILEDATA,SIDSIZE);
     SIDINIT();
     SIDPLAY();
-}
-
-void soundlib_play_raw(const int freqs[])
-{
-    unsigned int i;
-	unsigned char t, song_length = sizeof(freqs) / 2;
-	
-	SID.v1.ad    = 0x58; 	// Attack/decay voice 1
-	SID.v1.sr    = 0x59; 	// Sustain/release voice 1
-	SID.amp      = 0xFF; 	// Volume (0x1F)
-	SID.v1.pw	 = 0x0F0F; 	// Pulse width voice 1
-	
-	for (t = 0 ; t < song_length ; t += 2) {
-		SID.v1.freq  = freqs[t];	// Frequency 
-		SID.v1.ctrl  = 0x41;	// Control voice 1
-		for (i = 0 ; i < freqs[t + 1] * 3; i++) {}
-		SID.v1.ctrl  = 0x40;
-		for (i = 0 ; i < 1000 ; i++) {}
-	}		
 }
 
 void soundlib_stop()

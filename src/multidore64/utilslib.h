@@ -7,13 +7,11 @@ MultiDore 64 - A decent game engine for the commodore 64!
 (c) 2023 by Malte0621
 */
 
-#ifndef SOUNDLIB_H
-#define SOUNDLIB_H
+#ifndef UTILSLIB_H
+#define UTILSLIB_H
 
-#include <stdint.h>
-
-void soundlib_init();
-void soundlib_play(char FILEDATA[]);
-void soundlib_stop();
+void sleep(unsigned int ns);
+int cos(int angle);
+int sin(int angle);
 
 #endif
