@@ -15,12 +15,15 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include <string.h>
 
 int main(void) {
+  struct renderlib3d_camera *camera;
   struct renderlib3d_object *cube;
 
   renderlib_init();
   renderlib3d_init();
   soundlib_init();
   controller_init();
+
+  camera = renderlib3d_getcam();
 
   cube = renderlib3d_createobj(0);
   cube->pos->z = 5;
@@ -36,6 +39,8 @@ int main(void) {
     cube->rot->x = (cube->rot->x + 1) % 360;
     cube->rot->y = (cube->rot->y + 1) % 360;
     cube->rot->z = (cube->rot->z + 1) % 360;
+
+    // camera->pos->z -= 1;
 
     sleep(5000);
   }

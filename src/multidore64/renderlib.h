@@ -87,7 +87,10 @@ struct renderlib3d_object {
 struct renderlib3d_camera {
   struct renderlib3d_vector3 *pos;
   struct renderlib3d_vector3 *rot;
-  struct renderlib3d_vector3 *scl;
+  int fov;
+  int aspect_ratio;
+  int near_clip;
+  int far_clip;
 };
 
 void renderlib3d_setcam(struct renderlib3d_camera *cam);

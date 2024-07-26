@@ -637,7 +637,6 @@ void renderlib3d_init() {
   camera = malloc(sizeof(struct renderlib3d_camera));
   camera->pos = malloc(sizeof(struct renderlib3d_vector3));
   camera->rot = malloc(sizeof(struct renderlib3d_vector3));
-  camera->scl = malloc(sizeof(struct renderlib3d_vector3));
 
   camera->pos->x = 0;
   camera->pos->y = 0;
@@ -647,9 +646,10 @@ void renderlib3d_init() {
   camera->rot->y = 0;
   camera->rot->z = 0;
 
-  camera->scl->x = 1;
-  camera->scl->y = 1;
-  camera->scl->z = 1;
+  camera->fov = 128;
+  camera->aspect_ratio = 1;
+  camera->near_clip = 1;
+  camera->far_clip = 100;
 
   renderlib3d_reset();
 }
@@ -777,7 +777,6 @@ void renderlib3d_render() {
   // Get camera position, rotation, scale
   struct renderlib3d_vector3 *cam_pos = camera->pos;
   struct renderlib3d_vector3 *cam_rot = camera->rot;
-  struct renderlib3d_vector3 *cam_scl = camera->scl;
 
   // Clear the screen
   renderlib_clear();
