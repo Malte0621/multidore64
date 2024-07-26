@@ -23,7 +23,7 @@ int main(void) {
   controller_init();
 
   cube = renderlib3d_createobj(0);
-  cube->pos->z = 10;
+  cube->pos->z = 5;
   cube->scl->x = 4;
   cube->scl->y = 4;
   cube->scl->z = 4;
@@ -33,8 +33,12 @@ int main(void) {
   while (1) {
     renderlib3d_render();
 
+    cube->rot->x = (cube->rot->x + 1) % 360;
+    cube->rot->y = (cube->rot->y + 1) % 360;
+    cube->rot->z = (cube->rot->z + 1) % 360;
+
     cube->dirty = 1;
-    sleep(50);
+    sleep(5000);
   }
 
   renderlib3d_clear();

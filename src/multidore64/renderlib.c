@@ -654,26 +654,6 @@ void renderlib3d_init() {
   renderlib3d_reset();
 }
 
-void renderlib_project_point(int x, int y, int z, unsigned char *x2d,
-                             unsigned char *y2d) {
-  // Variables for fixed-point arithmetic
-  int fov = 256;           // Field of view, scaled up
-  int viewer_distance = 4; // Viewer distance, scaled up
-  int denominator;
-  int proj_x, proj_y;
-
-  // Calculate projection
-  denominator = viewer_distance + z;
-  if (denominator == 0)
-    denominator = 1; // Prevent division by zero
-
-  proj_x = (fov * x) / denominator;
-  proj_y = (fov * y) / denominator;
-
-  *x2d = (unsigned char)(proj_x + 20); // Adjust x-coord to screen center
-  *y2d = (unsigned char)(proj_y + 12); // Adjust y-coord to screen center
-}
-
 struct renderlib3d_object *renderlib3d_createobj(unsigned char shape) {
   unsigned char cobj;
   struct renderlib3d_object *obj = malloc(sizeof(struct renderlib3d_object));
@@ -695,6 +675,7 @@ struct renderlib3d_object *renderlib3d_createobj(unsigned char shape) {
 
   obj->shape = shape;
   obj->dirty = 1;
+  obj->color = color_white1;
   obj->pos = malloc(sizeof(struct renderlib3d_vector3));
   obj->rot = malloc(sizeof(struct renderlib3d_vector3));
   obj->scl = malloc(sizeof(struct renderlib3d_vector3));
@@ -733,6 +714,45 @@ void renderlib3d_destroyobj(struct renderlib3d_object *obj) {
   free(obj);
 }
 
+void rotate_x(int *x, int *y, int *z, int angle) {
+  int cos_angle = cos(angle);
+  int sin_angle = sin(angle);
+
+  int old_y = *y;
+  int old_z = *z;
+
+  *y = ((old_y * cos_angle - old_z * sin_angle) >> FIXED_POINT_SHIFT);
+  *z = ((old_y * sin_angle + old_z * cos_angle) >> FIXED_POINT_SHIFT);
+}
+
+void rotate_y(int *x, int *y, int *z, int angle) {
+  int cos_angle = cos(angle);
+  int sin_angle = sin(angle);
+
+  int old_x = *x;
+  int old_z = *z;
+
+  *x = ((old_x * cos_angle + old_z * sin_angle) >> FIXED_POINT_SHIFT);
+  *z = ((-old_x * sin_angle + old_z * cos_angle) >> FIXED_POINT_SHIFT);
+}
+
+void rotate_z(int *x, int *y, int *z, int angle) {
+  int cos_angle = cos(angle);
+  int sin_angle = sin(angle);
+
+  int old_x = *x;
+  int old_y = *y;
+
+  *x = ((old_x * cos_angle - old_y * sin_angle) >> FIXED_POINT_SHIFT);
+  *y = ((old_x * sin_angle + old_y * cos_angle) >> FIXED_POINT_SHIFT);
+}
+
+void renderlib_project_point(int x, int y, int z, unsigned char *x2d,
+                             unsigned char *y2d) {
+  *x2d = (unsigned char)(x + WIDTH / 2);
+  *y2d = (unsigned char)(y + HEIGHT / 2);
+}
+
 void renderlib3d_render() {
   // Declare all variables at the beginning
   unsigned char shape;
@@ -753,11 +773,15 @@ void renderlib3d_render() {
   int radius, height;
   int cos_theta1, sin_theta1, cos_theta2, sin_theta2, cos_phi1, sin_phi1,
       cos_phi2, sin_phi2;
+  int tx, ty, tz;
 
   // Get camera position, rotation, scale
   struct renderlib3d_vector3 *cam_pos = camera->pos;
   struct renderlib3d_vector3 *cam_rot = camera->rot;
   struct renderlib3d_vector3 *cam_scl = camera->scl;
+
+  // Clear the screen
+  renderlib_clear();
 
   // Loop through all objects
   for (k = 0; k < MAX_OBJECTS; k++) {
@@ -786,7 +810,7 @@ void renderlib3d_render() {
       half_scly = scl->y / 2;
       half_sclz = scl->z / 2;
 
-      // Define vertices for the cube
+      // Define cube vertices
       vertices[0][0] = pos->x - half_sclx;
       vertices[0][1] = pos->y - half_scly;
       vertices[0][2] = pos->z - half_sclz;
@@ -812,12 +836,26 @@ void renderlib3d_render() {
       vertices[7][1] = pos->y + half_scly;
       vertices[7][2] = pos->z + half_sclz;
 
+      // Apply rotation to vertices
       for (v = 0; v < 8; v++) {
+        tx = vertices[v][0] - pos->x;
+        ty = vertices[v][1] - pos->y;
+        tz = vertices[v][2] - pos->z;
+
+        rotate_x(&tx, &ty, &tz, rot->x);
+        rotate_y(&tx, &ty, &tz, rot->y);
+        rotate_z(&tx, &ty, &tz, rot->z);
+
+        vertices[v][0] = tx + pos->x;
+        vertices[v][1] = ty + pos->y;
+        vertices[v][2] = tz + pos->z;
+
+        // Apply projection and adjust for screen center
         renderlib_project_point(vertices[v][0], vertices[v][1], vertices[v][2],
                                 &x2d[v], &y2d[v]);
       }
 
-      // Define edges for the cube
+      // Define cube edges
       edges[0][0] = 0;
       edges[0][1] = 1;
       edges[1][0] = 1;
@@ -849,140 +887,206 @@ void renderlib3d_render() {
       }
       break;
 
-    case 1: // Pyramid
-      half_sclx = scl->x / 2;
-      half_scly = scl->y / 2;
-      half_sclz = scl->z / 2;
-
-      // Define vertices for the pyramid
-      apex[0] = pos->x;
-      apex[1] = pos->y - half_scly;
-      apex[2] = pos->z;
-
-      vertices[0][0] = apex[0];
-      vertices[0][1] = apex[1];
-      vertices[0][2] = apex[2];
-      vertices[1][0] = pos->x + half_sclx;
-      vertices[1][1] = pos->y + half_scly;
-      vertices[1][2] = pos->z + half_sclz;
-      vertices[2][0] = pos->x - half_sclx;
-      vertices[2][1] = pos->y + half_scly;
-      vertices[2][2] = pos->z + half_sclz;
-      vertices[3][0] = pos->x - half_sclx;
-      vertices[3][1] = pos->y + half_scly;
-      vertices[3][2] = pos->z - half_sclz;
-      vertices[4][0] = pos->x + half_sclx;
-      vertices[4][1] = pos->y + half_scly;
-      vertices[4][2] = pos->z - half_sclz;
-
-      for (v = 0; v < 5; v++) {
-        renderlib_project_point(vertices[v][0], vertices[v][1], vertices[v][2],
-                                &x2d[v], &y2d[v]);
-      }
-
-      // Define edges for the pyramid
-      edges[0][0] = 0;
-      edges[0][1] = 1;
-      edges[1][0] = 0;
-      edges[1][1] = 2;
-      edges[2][0] = 0;
-      edges[2][1] = 3;
-      edges[3][0] = 0;
-      edges[3][1] = 4;
-      edges[4][0] = 1;
-      edges[4][1] = 2;
-      edges[5][0] = 2;
-      edges[5][1] = 3;
-      edges[6][0] = 3;
-      edges[6][1] = 4;
-      edges[7][0] = 4;
-      edges[7][1] = 1;
-
-      for (e = 0; e < 8; e++) {
-        renderlib_drawline(x2d[edges[e][0]], y2d[edges[e][0]], x2d[edges[e][1]],
-                           y2d[edges[e][1]], 1, color);
-      }
-      break;
-
-    case 2: // Sphere
-      segments = 8;
+    case 1: // Sphere
+      radius = scl->x / 2;
+      segments = 8; // Number of segments to draw the sphere
       angle_step = 256 / segments;
 
-      for (i = 0; i < segments; ++i) {
-        for (j = 0; j < segments; ++j) {
-          theta1 = i * angle_step;
-          theta2 = (i + 1) * angle_step;
+      for (i = 0; i < segments; i++) {
+        theta1 = i * angle_step;
+        theta2 = (i + 1) * angle_step;
+
+        cos_theta1 = cos(theta1 * M_PI / 128);
+        sin_theta1 = sin(theta1 * M_PI / 128);
+        cos_theta2 = cos(theta2 * M_PI / 128);
+        sin_theta2 = sin(theta2 * M_PI / 128);
+
+        for (j = 0; j < segments; j++) {
           phi1 = j * angle_step;
           phi2 = (j + 1) * angle_step;
 
-          cos_theta1 = cos(theta1) * 256;
-          sin_theta1 = sin(theta1) * 256;
-          cos_theta2 = cos(theta2) * 256;
-          sin_theta2 = sin(theta2) * 256;
-          cos_phi1 = cos(phi1) * 256;
-          sin_phi1 = sin(phi1) * 256;
-          cos_phi2 = cos(phi2) * 256;
-          sin_phi2 = sin(phi2) * 256;
+          cos_phi1 = cos(phi1 * M_PI / 128);
+          sin_phi1 = sin(phi1 * M_PI / 128);
+          cos_phi2 = cos(phi2 * M_PI / 128);
+          sin_phi2 = sin(phi2 * M_PI / 128);
 
-          v1[0] = pos->x + (scl->x * sin_phi1 * cos_theta1) / 256;
-          v1[1] = pos->y + (scl->y * cos_phi1) / 256;
-          v1[2] = pos->z + (scl->z * sin_phi1 * sin_theta1) / 256;
+          v1[0] = pos->x + radius * sin_theta1 * cos_phi1;
+          v1[1] = pos->y + radius * sin_theta1 * sin_phi1;
+          v1[2] = pos->z + radius * cos_theta1;
 
-          v2[0] = pos->x + (scl->x * sin_phi1 * cos_theta2) / 256;
-          v2[1] = pos->y + (scl->y * cos_phi1) / 256;
-          v2[2] = pos->z + (scl->z * sin_phi1 * sin_theta2) / 256;
+          v2[0] = pos->x + radius * sin_theta2 * cos_phi1;
+          v2[1] = pos->y + radius * sin_theta2 * sin_phi1;
+          v2[2] = pos->z + radius * cos_theta2;
 
-          v3[0] = pos->x + (scl->x * sin_phi2 * cos_theta1) / 256;
-          v3[1] = pos->y + (scl->y * cos_phi2) / 256;
-          v3[2] = pos->z + (scl->z * sin_phi2 * sin_theta1) / 256;
+          v3[0] = pos->x + radius * sin_theta2 * cos_phi2;
+          v3[1] = pos->y + radius * sin_theta2 * sin_phi2;
+          v3[2] = pos->z + radius * cos_theta2;
 
-          v4[0] = pos->x + (scl->x * sin_phi2 * cos_theta2) / 256;
-          v4[1] = pos->y + (scl->y * cos_phi2) / 256;
-          v4[2] = pos->z + (scl->z * sin_phi2 * sin_theta2) / 256;
+          v4[0] = pos->x + radius * sin_theta1 * cos_phi2;
+          v4[1] = pos->y + radius * sin_theta1 * sin_phi2;
+          v4[2] = pos->z + radius * cos_theta1;
 
+          // Apply projection and adjust for screen center
           renderlib_project_point(v1[0], v1[1], v1[2], &x2d_temp[0],
                                   &y2d_temp[0]);
           renderlib_project_point(v2[0], v2[1], v2[2], &x2d_temp[1],
                                   &y2d_temp[1]);
           renderlib_project_point(v3[0], v3[1], v3[2], &x2d_temp[2],
                                   &y2d_temp[2]);
+          renderlib_project_point(v4[0], v4[1], v4[2], &x2d_temp[3],
+                                  &y2d_temp[3]);
 
           renderlib_drawline(x2d_temp[0], y2d_temp[0], x2d_temp[1], y2d_temp[1],
                              1, color);
           renderlib_drawline(x2d_temp[1], y2d_temp[1], x2d_temp[2], y2d_temp[2],
                              1, color);
-          renderlib_drawline(x2d_temp[2], y2d_temp[2], x2d_temp[0], y2d_temp[0],
+          renderlib_drawline(x2d_temp[2], y2d_temp[2], x2d_temp[3], y2d_temp[3],
+                             1, color);
+          renderlib_drawline(x2d_temp[3], y2d_temp[3], x2d_temp[0], y2d_temp[0],
                              1, color);
         }
       }
       break;
 
+    case 2: // Pyramid
+      half_sclx = scl->x / 2;
+      half_scly = scl->y / 2;
+      height = scl->z;
+
+      base_x = pos->x;
+      base_y = pos->y;
+      base_z = pos->z;
+      apex[0] = base_x;
+      apex[1] = base_y;
+      apex[2] = base_z + height;
+
+      // Define pyramid base vertices
+      vertices[0][0] = base_x - half_sclx;
+      vertices[0][1] = base_y - half_scly;
+      vertices[0][2] = base_z - half_sclx;
+      vertices[1][0] = base_x + half_sclx;
+      vertices[1][1] = base_y - half_scly;
+      vertices[1][2] = base_z - half_sclx;
+      vertices[2][0] = base_x + half_sclx;
+      vertices[2][1] = base_y + half_scly;
+      vertices[2][2] = base_z - half_sclx;
+      vertices[3][0] = base_x - half_sclx;
+      vertices[3][1] = base_y + half_scly;
+      vertices[3][2] = base_z - half_sclx;
+
+      // Apply rotation to base vertices
+      for (v = 0; v < 4; v++) {
+        tx = vertices[v][0] - base_x;
+        ty = vertices[v][1] - base_y;
+        tz = vertices[v][2] - base_z;
+
+        rotate_x(&tx, &ty, &tz, rot->x);
+        rotate_y(&tx, &ty, &tz, rot->y);
+        rotate_z(&tx, &ty, &tz, rot->z);
+
+        vertices[v][0] = tx + base_x;
+        vertices[v][1] = ty + base_y;
+        vertices[v][2] = tz + base_z;
+      }
+
+      // Apply rotation to apex
+      tx = apex[0] - base_x;
+      ty = apex[1] - base_y;
+      tz = apex[2] - base_z;
+
+      rotate_x(&tx, &ty, &tz, rot->x);
+      rotate_y(&tx, &ty, &tz, rot->y);
+      rotate_z(&tx, &ty, &tz, rot->z);
+
+      apex[0] = tx + base_x;
+      apex[1] = ty + base_y;
+      apex[2] = tz + base_z;
+
+      // Apply projection and adjust for screen center
+      for (v = 0; v < 4; v++) {
+        renderlib_project_point(vertices[v][0], vertices[v][1], vertices[v][2],
+                                &x2d[v], &y2d[v]);
+      }
+      renderlib_project_point(apex[0], apex[1], apex[2], &x2d_temp[0],
+                              &y2d_temp[0]);
+
+      // Draw pyramid edges
+      for (v = 0; v < 4; v++) {
+        renderlib_drawline(x2d[v], y2d[v], x2d[(v + 1) % 4], y2d[(v + 1) % 4],
+                           1, color);
+        renderlib_drawline(x2d[v], y2d[v], x2d_temp[0], y2d_temp[0], 1, color);
+      }
+      break;
+
     case 3: // Cylinder
-      segments = 8;
+      radius = scl->x / 2;
+      height = scl->z;
+      segments = 8; // Number of segments to draw the cylinder
       angle_step = 256 / segments;
 
-      for (i = 0; i < segments; ++i) {
+      for (i = 0; i < segments; i++) {
         theta1 = i * angle_step;
         theta2 = (i + 1) * angle_step;
 
-        v1[0] = pos->x + (scl->x * cos(theta1)) / 256;
-        v1[1] = pos->y + (scl->y);
-        v1[2] = pos->z + (scl->z * sin(theta1)) / 256;
+        cos_theta1 = cos(theta1 * M_PI / 128);
+        sin_theta1 = sin(theta1 * M_PI / 128);
+        cos_theta2 = cos(theta2 * M_PI / 128);
+        sin_theta2 = sin(theta2 * M_PI / 128);
 
-        v2[0] = pos->x + (scl->x * cos(theta2)) / 256;
-        v2[1] = pos->y + (scl->y);
-        v2[2] = pos->z + (scl->z * sin(theta2)) / 256;
+        v1[0] = pos->x + radius * cos_theta1 / 256;
+        v1[1] = pos->y + radius * sin_theta1 / 256;
+        v1[2] = pos->z;
 
+        v2[0] = pos->x + radius * cos_theta2 / 256;
+        v2[1] = pos->y + radius * sin_theta2 / 256;
+        v2[2] = pos->z;
+
+        v3[0] = v1[0];
+        v3[1] = v1[1];
+        v3[2] = pos->z + height;
+
+        v4[0] = v2[0];
+        v4[1] = v2[1];
+        v4[2] = pos->z + height;
+
+        // Apply rotations to vertices
+        rotate_x(&v1[0], &v1[1], &v1[2], rot->x);
+        rotate_y(&v1[0], &v1[1], &v1[2], rot->y);
+        rotate_z(&v1[0], &v1[1], &v1[2], rot->z);
+
+        rotate_x(&v2[0], &v2[1], &v2[2], rot->x);
+        rotate_y(&v2[0], &v2[1], &v2[2], rot->y);
+        rotate_z(&v2[0], &v2[1], &v2[2], rot->z);
+
+        rotate_x(&v3[0], &v3[1], &v3[2], rot->x);
+        rotate_y(&v3[0], &v3[1], &v3[2], rot->y);
+        rotate_z(&v3[0], &v3[1], &v3[2], rot->z);
+
+        rotate_x(&v4[0], &v4[1], &v4[2], rot->x);
+        rotate_y(&v4[0], &v4[1], &v4[2], rot->y);
+        rotate_z(&v4[0], &v4[1], &v4[2], rot->z);
+
+        // Project vertices
         renderlib_project_point(v1[0], v1[1], v1[2], &x2d_temp[0],
                                 &y2d_temp[0]);
         renderlib_project_point(v2[0], v2[1], v2[2], &x2d_temp[1],
                                 &y2d_temp[1]);
+        renderlib_project_point(v3[0], v3[1], v3[2], &x2d_temp[2],
+                                &y2d_temp[2]);
+        renderlib_project_point(v4[0], v4[1], v4[2], &x2d_temp[3],
+                                &y2d_temp[3]);
 
+        // Draw lines
         renderlib_drawline(x2d_temp[0], y2d_temp[0], x2d_temp[1], y2d_temp[1],
+                           1, color);
+        renderlib_drawline(x2d_temp[0], y2d_temp[0], x2d_temp[2], y2d_temp[2],
+                           1, color);
+        renderlib_drawline(x2d_temp[1], y2d_temp[1], x2d_temp[3], y2d_temp[3],
+                           1, color);
+        renderlib_drawline(x2d_temp[2], y2d_temp[2], x2d_temp[3], y2d_temp[3],
                            1, color);
       }
       break;
-
     case 4: // Cone
       segments = 8;
       angle_step = 256 / segments;
@@ -999,6 +1103,15 @@ void renderlib3d_render() {
         v2[0] = pos->x + (scl->x * cos(theta2)) / 256;
         v2[1] = pos->y + (scl->y - scl->y / 2);
         v2[2] = pos->z + (scl->z * sin(theta2)) / 256;
+
+        // Apply rotation to base vertices
+        rotate_x(&v1[0], &v1[1], &v1[2], rot->x);
+        rotate_y(&v1[0], &v1[1], &v1[2], rot->y);
+        rotate_z(&v1[0], &v1[1], &v1[2], rot->z);
+
+        rotate_x(&v2[0], &v2[1], &v2[2], rot->x);
+        rotate_y(&v2[0], &v2[1], &v2[2], rot->y);
+        rotate_z(&v2[0], &v2[1], &v2[2], rot->z);
 
         renderlib_project_point(v1[0], v1[1], v1[2], &x2d_temp[0],
                                 &y2d_temp[0]);
@@ -1017,44 +1130,68 @@ void renderlib3d_render() {
         v1[1] = pos->y + (scl->y - scl->y / 2);
         v1[2] = pos->z + (scl->z * sin(theta1)) / 256;
 
+        // Apply rotation to cone vertex
+        rotate_x(&v1[0], &v1[1], &v1[2], rot->x);
+        rotate_y(&v1[0], &v1[1], &v1[2], rot->y);
+        rotate_z(&v1[0], &v1[1], &v1[2], rot->z);
+
         renderlib_project_point(v1[0], v1[1], v1[2], &x2d_temp[0],
                                 &y2d_temp[0]);
         renderlib_drawline(x2d_temp[0], y2d_temp[0], x2d_temp[0],
-                           y2d_temp[0] - 16, 1, color); // Draw cone lines
+                           y2d_temp[0] - 16, 1, color);
       }
       break;
-
     case 5: // Plane
-      vertices[0][0] = pos->x - scl->x;
-      vertices[0][1] = pos->y;
-      vertices[0][2] = pos->z - scl->z;
-      vertices[1][0] = pos->x + scl->x;
-      vertices[1][1] = pos->y;
-      vertices[1][2] = pos->z - scl->z;
-      vertices[2][0] = pos->x + scl->x;
-      vertices[2][1] = pos->y;
-      vertices[2][2] = pos->z + scl->z;
-      vertices[3][0] = pos->x - scl->x;
-      vertices[3][1] = pos->y;
-      vertices[3][2] = pos->z + scl->z;
+      base_x = scl->x / 2;
+      base_y = scl->y / 2;
 
+      // Define vertices
+      vertices[0][0] = pos->x - base_x;
+      vertices[0][1] = pos->y - base_y;
+      vertices[0][2] = pos->z;
+
+      vertices[1][0] = pos->x + base_x;
+      vertices[1][1] = pos->y - base_y;
+      vertices[1][2] = pos->z;
+
+      vertices[2][0] = pos->x + base_x;
+      vertices[2][1] = pos->y + base_y;
+      vertices[2][2] = pos->z;
+
+      vertices[3][0] = pos->x - base_x;
+      vertices[3][1] = pos->y + base_y;
+      vertices[3][2] = pos->z;
+
+      // Apply rotation to vertices
       for (v = 0; v < 4; v++) {
+        tx = vertices[v][0] - pos->x;
+        ty = vertices[v][1] - pos->y;
+        tz = vertices[v][2] - pos->z;
+
+        rotate_x(&tx, &ty, &tz, rot->x);
+        rotate_y(&tx, &ty, &tz, rot->y);
+        rotate_z(&tx, &ty, &tz, rot->z);
+
+        vertices[v][0] = tx + pos->x;
+        vertices[v][1] = ty + pos->y;
+        vertices[v][2] = tz + pos->z;
+
         renderlib_project_point(vertices[v][0], vertices[v][1], vertices[v][2],
                                 &x2d[v], &y2d[v]);
       }
 
-      // Draw plane edges
-      renderlib_drawline(x2d[0], y2d[0], x2d[1], y2d[1], 1, color);
-      renderlib_drawline(x2d[1], y2d[1], x2d[2], y2d[2], 1, color);
-      renderlib_drawline(x2d[2], y2d[2], x2d[3], y2d[3], 1, color);
-      renderlib_drawline(x2d[3], y2d[3], x2d[0], y2d[0], 1, color);
+      // Draw edges
+      for (e = 0; e < 4; e++) {
+        renderlib_drawline(x2d[e], y2d[e], x2d[(e + 1) % 4], y2d[(e + 1) % 4],
+                           1, color);
+      }
       break;
 
     default:
-      // Unknown shape
       break;
     }
 
+    // Clear the dirty flag
     obj->dirty = 0;
   }
 }

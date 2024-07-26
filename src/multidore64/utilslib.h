@@ -10,9 +10,14 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #ifndef UTILSLIB_H
 #define UTILSLIB_H
 
-#define FIXED_PI 31415
-#define FIXED_2_PI 62831
-#define FIXED_PI_DIV_2 15707
+#define WIDTH 320
+#define HEIGHT 200
+
+#define M_PI 31415
+
+#define FIXED_POINT_SHIFT 8
+#define FIXED_POINT_SCALE (1 << FIXED_POINT_SHIFT)
+
 
 void sleep(unsigned int ns);
 int cos(int angle);
