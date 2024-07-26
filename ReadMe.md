@@ -4,7 +4,7 @@
 
 Multidore64 is a game engine for the commodore 64. It is written in C and is designed to be easy to use. It include helpful features/tools. Its designed to be used with the [cc65](https://cc65.github.io/) compiler.
 
-(c) 2023 Malte0621
+(c) 2024 Malte0621
 
 ### Disclaimer
 **Multidore64 is a work in progress. It is not yet ready for use in any serious projects.**
