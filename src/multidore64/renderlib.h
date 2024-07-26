@@ -72,7 +72,6 @@ SHAPES:
 */
 struct renderlib3d_object {
   unsigned char shape;
-  unsigned char dirty;
   unsigned char id; // MAKE SURE TO ADJUST WITH MAX_OBJECTS.
   unsigned char color;
   /*

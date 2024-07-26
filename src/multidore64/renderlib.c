@@ -674,7 +674,6 @@ struct renderlib3d_object *renderlib3d_createobj(unsigned char shape) {
   }
 
   obj->shape = shape;
-  obj->dirty = 1;
   obj->color = color_white1;
   obj->pos = malloc(sizeof(struct renderlib3d_vector3));
   obj->rot = malloc(sizeof(struct renderlib3d_vector3));
@@ -788,7 +787,7 @@ void renderlib3d_render() {
     // Get the object
     struct renderlib3d_object *obj = objects[k];
 
-    if (obj == NULL || obj->dirty == 0) {
+    if (obj == NULL) {
       continue;
     }
 
@@ -1190,9 +1189,6 @@ void renderlib3d_render() {
     default:
       break;
     }
-
-    // Clear the dirty flag
-    obj->dirty = 0;
   }
 }
 

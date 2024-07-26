@@ -37,7 +37,6 @@ int main(void) {
     cube->rot->y = (cube->rot->y + 1) % 360;
     cube->rot->z = (cube->rot->z + 1) % 360;
 
-    cube->dirty = 1;
     sleep(5000);
   }
 
