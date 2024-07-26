@@ -646,11 +646,6 @@ void renderlib3d_init() {
   camera->rot->y = 0;
   camera->rot->z = 0;
 
-  camera->fov = 128;
-  camera->aspect_ratio = 1;
-  camera->near_clip = 1;
-  camera->far_clip = 100;
-
   renderlib3d_reset();
 }
 
@@ -748,8 +743,8 @@ void rotate_z(int *x, int *y, int *z, int angle) {
 
 void renderlib_project_point(int x, int y, int z, unsigned char *x2d,
                              unsigned char *y2d) {
-  *x2d = (unsigned char)(x + WIDTH / 2);
-  *y2d = (unsigned char)(y + HEIGHT / 2);
+  *x2d = (unsigned char)(x + tgi_getmaxx() / 2);
+  *y2d = (unsigned char)(y + tgi_getmaxy() / 2);
 }
 
 void renderlib3d_render() {
