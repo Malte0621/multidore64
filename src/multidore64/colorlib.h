@@ -7,6 +7,8 @@ MultiDore 64 - A decent game engine for the commodore 64!
 (c) 2023 by Malte0621
 */
 
+#include <stdlib.h>
+
 const unsigned char color_black = 0x00;
 const unsigned char color_white = 0x01;
 const unsigned char color_red = 0x02;

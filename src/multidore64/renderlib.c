@@ -7,16 +7,17 @@ MultiDore 64 - A decent game engine for the commodore 64!
 (c) 2023 by Malte0621
 */
 
+#include "renderlib.h"
+#include "utilslib.h"
+#include <c64.h>
+#include <cbm.h>
+#include <conio.h>
+#include <peekpoke.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <c64.h>
-#include <conio.h>
 #include <string.h>
-#include <peekpoke.h>
-#include <cbm.h>
-#include "config.h"
-#include "renderlib.h"
 #include <tgi.h>
+
 // #include "colorlib.h"
 
 #define tgi_sprite(spr) tgi_ioctl(0, (void *)(spr))
@@ -45,104 +46,47 @@ const unsigned char renderlib_mode_graphics = 1;
 unsigned char drawPage = 0;
 #endif
 
-unsigned short get_renderlib_screen_width()
-{
+unsigned short get_renderlib_screen_width() {
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        return tgi_getmaxx();
-    }
+  if (renderMode == renderlib_mode_graphics) {
+    return tgi_getmaxx();
+  }
 #endif
 
-    return renderlib_screen_width;
+  return renderlib_screen_width;
 }
 
-unsigned short get_renderlib_screen_height()
-{
+unsigned short get_renderlib_screen_height() {
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        return tgi_getmaxy();
-    }
+  if (renderMode == renderlib_mode_graphics) {
+    return tgi_getmaxy();
+  }
 #endif
-    return renderlib_screen_height;
+  return renderlib_screen_height;
 }
 
-#define TABLE_SIZE 360
-int cos_table[TABLE_SIZE] = {1000, 999, 998, 997, 995, 994, 992, 990, 988, 986, 984, 982, 980, 978, 975, 973, 970, 968, 965, 962, 960, 957, 954, 951, 948, 945, 942, 939, 936, 933, 930, 927, 923, 920, 917, 913, 910, 906, 903, 899, 896, 892, 888, 885, 881, 877, 873, 869, 865, 861, 857, 853, 849, 845, 841, 837, 833, 829, 825, 821, 817, 813, 808, 804, 800, 796, 791, 787, 783, 778, 774, 769, 765, 760, 756, 751, 747, 742, 738, 733, 729, 724, 719, 715, 710, 705, 701, 696, 691, 687, 682, 677, 672, 668, 663, 658, 653, 648, 643, 639, 634, 629, 624, 619, 614, 609, 604, 599, 594, 589, 584, 579, 574, 569, 564, 559, 554, 549, 544, 539, 534, 529, 524, 519, 514, 509, 504, 499, 494, 489, 484, 479, 474, 469, 464, 459, 454, 449, 444, 439, 434, 429, 424, 419, 414, 409, 404, 399, 394, 389, 384, 379, 374, 369, 364, 359, 354, 349, 344, 339, 334, 329, 324, 319, 314, 309, 304, 299, 294, 289, 284, 279, 274, 269, 264, 259, 254, 249, 244, 239, 234, 229, 224, 219, 214, 209, 204, 199, 194, 189, 184, 179, 174, 169, 164, 159, 154, 149, 144, 139, 134, 129, 124, 119, 114, 109, 104, 99, 94, 89, 84, 79, 74, 69, 64, 59, 54, 49, 44, 39, 34, 29, 24, 19, 14, 9, 4, 0, -4, -9, -14, -19, -24, -29, -34, -39, -44, -49, -54, -59, -64, -69, -74, -79, -84, -89, -94, -99, -104, -109, -114, -119, -124, -129, -134, -139, -144, -149, -154, -159, -164, -169, -174, -179, -184, -189, -194, -199, -204, -209, -214, -219, -224, -229, -234, -239, -244, -249, -254, -259, -264, -269, -274, -279, -284, -289, -294, -299, -304, -309, -314, -319, -324, -329, -334, -339, -344, -349, -354, -359, -364, -369, -374, -379, -384, -389, -394, -399, -404, -409, -414, -419, -424, -429, -434, -439, -444, -449, -454, -459, -464, -469, -474, -479, -484, -489, -494, -499, -504, -509, -514, -519, -524, -529, -534, -539, -544, -549, -554, -559, -564, -569, -574, -579, -584, -589, -594, -599, -604, -609, -614, -619, -624, -629, -634, -639, -643, -648, -653, -658};
-int sin_table[TABLE_SIZE] = {0, 6, 13, 19, 25, 31, 38, 44, 50, 56, 63, 69, 75, 81, 87, 93, 99, 105, 111, 117, 123, 128, 134, 140, 145, 151, 156, 162, 167, 172, 177, 182, 187, 192, 197, 202, 206, 211, 215, 219, 224, 228, 232, 235, 239, 243, 246, 250, 253, 256, 259, 262, 265, 267, 270, 272, 274, 276, 278, 280, 282, 283, 285, 286, 287, 288, 289, 290, 290, 291, 291, 291, 291, 291, 291, 291, 290, 290, 289, 288, 287, 286, 285, 283, 282, 280, 278, 276, 274, 272, 270, 267, 265, 262, 259, 256, 253, 250, 246, 243, 239, 235, 232, 228, 224, 219, 215, 211, 206, 202, 197, 192, 187, 182, 177, 172, 167, 162, 156, 151, 145, 140, 134, 128, 123, 117, 111, 105, 99, 93, 87, 81, 75, 69, 63, 56, 50, 44, 38, 31, 25, 19, 13, 6, 0, -6, -13, -19, -25, -31, -38, -44, -50, -56, -63, -69, -75, -81, -87, -93, -99, -105, -111, -117, -123, -128, -134, -140, -145, -151, -156, -162, -167, -172, -177, -182, -187, -192, -197, -202, -206, -211, -215, -219, -224, -228, -232, -235, -239, -243, -246, -250, -253, -256, -259, -262, -265, -267, -270, -272, -274, -276, -278, -280, -282, -283, -285, -286, -287, -288, -289, -290, -290, -291, -291, -291, -291, -291, -291, -291, -290, -290, -289, -288, -287, -286, -285, -283, -282, -280, -278, -276, -274, -272, -270, -267, -265, -262, -259, -256, -253, -250, -246, -243, -239, -235, -232, -228, -224, -219, -215, -211, -206, -202, -197, -192, -187, -182, -177, -172, -167, -162, -156, -151, -145, -140, -134, -128, -123, -117, -111, -105, -99, -93, -87, -81, -75, -69, -63, -56, -50, -44, -38, -31, -25, -19, -13, -6, 0, 6, 13, 19, 25, 31, 38, 44, 50, 56, 63, 69, 75, 81, 87, 93, 99, 105, 111, 117, 123, 128, 134, 140, 145, 151, 156, 162, 167, 172, 177, 182, 187, 192, 197, 202, 206, 211, 215, 219, 224, 228, 232, 235, 239, 243, 246, 250, 253, 256, 259, 262, 265, 267, 270, 272, 274, 276, 278, 280, 282, 283, 285, 286, 287, 288, 289, 290, 290, 291, 291, 291};
+void msg(char *msg) { printf("[MD64]: %s", msg); }
 
-int cos(int angle)
-{
-    // Normalize the angle to be within the range of 0 to 359 degrees
-    angle = angle % TABLE_SIZE;
-    if (angle < 0)
-    {
-        angle += TABLE_SIZE;
-    }
+void initErrorMsg() { msg("Renderlib has not been initialized!"); }
 
-    // Return the cosine value from the lookup table
-    return cos_table[angle];
-}
+void initErrorMsg2() { msg("Renderlib has already been initialized!"); }
 
-int sin(int angle)
-{
-    // Normalize the angle to be within the range of 0 to 359 degrees
-    angle = angle % TABLE_SIZE;
-    if (angle < 0)
-    {
-        angle += TABLE_SIZE;
-    }
-
-    // Return the sine value from the lookup table
-    return sin_table[angle];
-}
-
-void sleep(unsigned int ms)
-{
-    unsigned int i;
-    for (i = 0; i < ms; i++)
-    {
-        __asm__("nop");
-    }
-}
-
-void msg(char *msg)
-{
-    printf("[MD64]: %s", msg);
-}
-
-void initErrorMsg()
-{
-    msg("Renderlib has not been initialized!");
-}
-
-void initErrorMsg2()
-{
-    msg("Renderlib has already been initialized!");
-}
-
-void renderlib_clear()
-{
-    unsigned char color = PEEK(53280);
-    if (hasBeenInitialized == 0)
-    {
-        printf("%c", 0x93);
-        return;
-    }
+void renderlib_clear() {
+  unsigned char color = PEEK(53280);
+  if (hasBeenInitialized == 0) {
+    printf("%c", 0x93);
+    return;
+  }
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        tgi_clear();
-    }
-    else
-    {
+  if (renderMode == renderlib_mode_graphics) {
+    tgi_clear();
+  } else {
 #endif
 
-        renderlib_fillrect(0, 0, 39, 23, color);
+    renderlib_fillrect(0, 0, 39, 23, color);
 
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    }
+  }
 #endif
 }
 
@@ -166,794 +110,953 @@ Colors:
 14 = light blue
 15 = light grey
 */
-// The lower 4 bits represent the color intensity of the blue channel, the next 3 bits represent the color intensity of the green channel, and the highest bit represents the color intensity of the red channel.
-const unsigned char tgi_static_palette[] = {
-    0x00, 0xff, 0x02, 0x03, 0x04, 0x05, 0x06, 0x0e,
-    0x08, 0x10, 0x0c, 0x1c, 0x0e, 0x14, 0x19, 0x1f};
+// The lower 4 bits represent the color intensity of the blue channel, the next
+// 3 bits represent the color intensity of the green channel, and the highest
+// bit represents the color intensity of the red channel.
+const unsigned char tgi_static_palette[] = {0x00, 0xff, 0x02, 0x03, 0x04, 0x05,
+                                            0x06, 0x0e, 0x08, 0x10, 0x0c, 0x1c,
+                                            0x0e, 0x14, 0x19, 0x1f};
 
-void renderlib_draw()
-{
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
-    }
+void renderlib_draw() {
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
 
-    if (renderMode == renderlib_mode_graphics)
-    {
-        while (tgi_busy())
-        {
-            sleep(1);
-        }
-        drawPage = !drawPage;
-        tgi_setdrawpage(drawPage);
-        tgi_setviewpage(!drawPage);
-        tgi_updatedisplay();
+  if (renderMode == renderlib_mode_graphics) {
+    while (tgi_busy()) {
+      sleep(1);
     }
+    drawPage = !drawPage;
+    tgi_setdrawpage(drawPage);
+    tgi_setviewpage(!drawPage);
+    tgi_updatedisplay();
+  }
 }
 
-void renderlib_setmode(unsigned char state)
-{
-    if (state == 0)
-    {
-        // Revert to text mode
-        tgi_uninstall();
-        tgi_unload();
+void renderlib_setmode(unsigned char state) {
+  if (state == 0) {
+    // Revert to text mode
+    tgi_uninstall();
+    tgi_unload();
 
-        renderlib_screen_width = 40;
-        renderlib_screen_height = 25;
-    }
-    else
-    {
-        // Enter graphics mode
-        tgi_install(tgi_static_stddrv);
-        tgi_init();
-        tgi_setpalette(tgi_static_palette);
-        tgi_clear();
+    renderlib_screen_width = 40;
+    renderlib_screen_height = 25;
+  } else {
+    // Enter graphics mode
+    tgi_install(tgi_static_stddrv);
+    tgi_init();
+    tgi_setpalette(tgi_static_palette);
+    tgi_clear();
 
-        tgi_setdrawpage(drawPage);
-        tgi_setviewpage(!drawPage);
+    tgi_setdrawpage(drawPage);
+    tgi_setviewpage(!drawPage);
 
-        tgi_updatedisplay();
+    tgi_updatedisplay();
 
-        // renderlib_setcolor(color_black1, color_white1);
+    // renderlib_setcolor(color_black1, color_white1);
 
-        renderlib_screen_width = tgi_getxres();
-        renderlib_screen_height = tgi_getyres();
-    }
-    renderMode = state;
+    renderlib_screen_width = tgi_getxres();
+    renderlib_screen_height = tgi_getyres();
+  }
+  renderMode = state;
 }
 #endif
 
-void renderlib_setcolor(unsigned char background, unsigned char foreground)
-{
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
-    }
+void renderlib_setcolor(unsigned char background, unsigned char foreground) {
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
 
-    // Set the color of the pixel at position (x, y) to the desired color
-    POKE(53280, background);
-    POKE(53281, foreground);
+  // Set the color of the pixel at position (x, y) to the desired color
+  POKE(53280, background);
+  POKE(53281, foreground);
 }
 
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
 #include "font8x8_basic.h"
 #endif
 
-void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color, unsigned char c)
-{
-    /*
-    #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-        char *c2 = malloc(2);
-        c2[0] = c;
-        c2[1] = '\0';
-    #endif
-    */
+void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color,
+                        unsigned char c) {
+  /*
+  #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+      char *c2 = malloc(2);
+      c2[0] = c;
+      c2[1] = '\0';
+  #endif
+  */
 
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
+
+  // Set the color of the pixel at position (x, y) to the desired color
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  if (renderMode == renderlib_mode_graphics) {
+    // Draw the character using pixels
+    unsigned char i, j;
+    for (i = 0; i < 8; i++) {
+      for (j = 0; j < 8; j++) {
+        if ((font8x8_basic[c][i] >> j) & 1) {
+          renderlib_setpixel(x * 8 + j, y * 8 + i, color);
+        }
+      }
     }
+    // tgi_setcolor(color);
+    // tgi_outtextxy(x, y, c2);
+  } else {
+#endif
+    // Draw the character
+    POKE(55296 + y * 40 + x, color);
+    POKE(1024 + y * 40 + x, c);
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  }
+#endif
+}
+
+unsigned char renderlib_getchar(unsigned char x, unsigned char y) {
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return 0;
+  }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  if (renderMode == renderlib_mode_graphics) {
+    msg("Cannot get character in graphics mode!");
+    return 0;
+  }
+#endif
+
+  // Get the character at position (x, y)
+  return PEEK(1024 + y * 40 + x);
+}
+
+void renderlib_setpixel(unsigned char x, unsigned char y, unsigned char color) {
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
+
+  if (x >= get_renderlib_screen_width() || y >= get_renderlib_screen_height())
+    return;
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  if (renderMode == renderlib_mode_graphics) {
+    // Set the color of the pixel at position (x, y) to the desired color
+    // POKE(55296 + y * 40 + x, color);
+    tgi_setcolor(color);
+    tgi_setpixel(x, y);
+    return;
+  } else {
+
+#endif
 
     // Set the color of the pixel at position (x, y) to the desired color
+    renderlib_drawchar(x, y, color, 224);
 
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        // Draw the character using pixels
-        unsigned char i, j;
-        for (i = 0; i < 8; i++)
-        {
-            for (j = 0; j < 8; j++)
-            {
-                if ((font8x8_basic[c][i] >> j) & 1)
-                {
-                    renderlib_setpixel(x * 8 + j, y * 8 + i, color);
-                }
-            }
-        }
-        // tgi_setcolor(color);
-        // tgi_outtextxy(x, y, c2);
-    }
-    else
-    {
-#endif
-        // Draw the character
-        POKE(55296 + y * 40 + x, color);
-        POKE(1024 + y * 40 + x, c);
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    }
+  }
 #endif
 }
 
-unsigned char renderlib_getchar(unsigned char x, unsigned char y)
-{
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return 0;
-    }
+unsigned char renderlib_getpixel(unsigned char x, unsigned char y) {
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return 0;
+  }
 
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        msg("Cannot get character in graphics mode!");
-        return 0;
-    }
+  if (renderMode == renderlib_mode_graphics) {
+    // Get the color of the pixel at position (x, y)
+    return tgi_getpixel(x, y);
+  } else {
 #endif
-
-    // Get the character at position (x, y)
-    return PEEK(1024 + y * 40 + x);
-}
-
-void renderlib_setpixel(unsigned char x, unsigned char y, unsigned char color)
-{
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
-    }
-
-    if (x >= get_renderlib_screen_width() || y >= get_renderlib_screen_height())
-        return;
-
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        // Set the color of the pixel at position (x, y) to the desired color
-        // POKE(55296 + y * 40 + x, color);
-        tgi_setcolor(color);
-        tgi_setpixel(x, y);
-        return;
-    }
-    else
-    {
-
-#endif
-
-        // Set the color of the pixel at position (x, y) to the desired color
-        renderlib_drawchar(x, y, color, 224);
-
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    }
-#endif
-}
-
-unsigned char renderlib_getpixel(unsigned char x, unsigned char y)
-{
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return 0;
-    }
-
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        // Get the color of the pixel at position (x, y)
-        return tgi_getpixel(x, y);
-    }
-    else
-    {
-#endif
-
-        // Get the color of the pixel at position (x, y)
-        return PEEK(55296 + y * 40 + x);
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    }
-#endif
-}
-
-void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color, const char *str2)
-{
-    char *str = malloc(10); // DEBUG
-
-    // Get the length of the string
-    unsigned char len = strlen(str);
-    // Loop through the string
-    unsigned char i = 0;
-
-    sprintf(str, "%d", tgi_getmaxcolor()); // DEBUG
-
-    /*
-    #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-        if (renderMode == renderlib_mode_graphics)
-        {
-            tgi_setcolor(color);
-            tgi_outtextxy(x, y, str);
-            return;
-        }
-    #endif
-    */
-
-    while (i < len)
-    {
-        // Draw the character
-        renderlib_drawchar(x + i, y, color, str[i]);
-        i++;
-    }
-}
-
-void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, unsigned char stopColor)
-{
-    // Get the shape around x, y
-    // Fill outwards until we reach the edge of the shape
 
     // Get the color of the pixel at position (x, y)
-    unsigned char currentColor = renderlib_getpixel(x, y);
+    return PEEK(55296 + y * 40 + x);
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  }
+#endif
+}
 
-    // Check if the color is the same as the stop color
-    if (currentColor == stopColor)
-    {
-        // Return
-        return;
-    }
+void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color,
+                          const char *str2) {
+  char *str = malloc(10); // DEBUG
 
-    // Set the color of the pixel at position (x, y) to the desired color
-    renderlib_setpixel(x, y, color);
+  // Get the length of the string
+  unsigned char len = strlen(str);
+  // Loop through the string
+  unsigned char i = 0;
 
-    // Check if the pixel is on the left edge
-    if (x > 0)
-    {
-        // Fill the pixel to the left
-        renderlib_floodfill(x - 1, y, color, stopColor);
-    }
+  sprintf(str, "%d", tgi_getmaxcolor()); // DEBUG
 
-    // Check if the pixel is on the right edge
-    if (x < 40)
-    {
-        // Fill the pixel to the right
-        renderlib_floodfill(x + 1, y, color, stopColor);
-    }
+  /*
+  #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+      if (renderMode == renderlib_mode_graphics)
+      {
+          tgi_setcolor(color);
+          tgi_outtextxy(x, y, str);
+          return;
+      }
+  #endif
+  */
 
-    // Check if the pixel is on the top edge
-    if (y > 0)
-    {
-        // Fill the pixel above
-        renderlib_floodfill(x, y - 1, color, stopColor);
-    }
+  while (i < len) {
+    // Draw the character
+    renderlib_drawchar(x + i, y, color, str[i]);
+    i++;
+  }
+}
 
-    // Check if the pixel is on the bottom edge
-    if (y < 25)
-    {
-        // Fill the pixel below
-        renderlib_floodfill(x, y + 1, color, stopColor);
-    }
+void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color,
+                         unsigned char stopColor) {
+  // Get the shape around x, y
+  // Fill outwards until we reach the edge of the shape
+
+  // Get the color of the pixel at position (x, y)
+  unsigned char currentColor = renderlib_getpixel(x, y);
+
+  // Check if the color is the same as the stop color
+  if (currentColor == stopColor) {
+    // Return
+    return;
+  }
+
+  // Set the color of the pixel at position (x, y) to the desired color
+  renderlib_setpixel(x, y, color);
+
+  // Check if the pixel is on the left edge
+  if (x > 0) {
+    // Fill the pixel to the left
+    renderlib_floodfill(x - 1, y, color, stopColor);
+  }
+
+  // Check if the pixel is on the right edge
+  if (x < 40) {
+    // Fill the pixel to the right
+    renderlib_floodfill(x + 1, y, color, stopColor);
+  }
+
+  // Check if the pixel is on the top edge
+  if (y > 0) {
+    // Fill the pixel above
+    renderlib_floodfill(x, y - 1, color, stopColor);
+  }
+
+  // Check if the pixel is on the bottom edge
+  if (y < 25) {
+    // Fill the pixel below
+    renderlib_floodfill(x, y + 1, color, stopColor);
+  }
 }
 
 // Find the center of a filled shape using one pixel from the edge of it.
-char renderlib_findcenter(unsigned char x, unsigned char y, unsigned char *outX, unsigned char *outY)
-{
-    unsigned char diff;
-    unsigned char tmp;
-    char useTemp;
-    unsigned char i;
-    unsigned char currentColor = renderlib_getpixel(x, y);
+char renderlib_findcenter(unsigned char x, unsigned char y, unsigned char *outX,
+                          unsigned char *outY) {
+  unsigned char diff;
+  unsigned char tmp;
+  char useTemp;
+  unsigned char i;
+  unsigned char currentColor = renderlib_getpixel(x, y);
 
-    for (i = x; i < 40; i++)
-    {
-        // Check if the color of the pixel at position (i, j) is the same as the current color
-        if (renderlib_getpixel(i, y) == currentColor)
-        {
-            break;
-        }
-        else
-        {
-            diff++;
-        }
+  for (i = x; i < 40; i++) {
+    // Check if the color of the pixel at position (i, j) is the same as the
+    // current color
+    if (renderlib_getpixel(i, y) == currentColor) {
+      break;
+    } else {
+      diff++;
     }
-    tmp = diff;
-    useTemp = 1;
-    for (i = x; i > 0; i--)
-    {
-        // Check if the color of the pixel at position (i, j) is the same as the current color
-        if (renderlib_getpixel(i, y) == currentColor)
-        {
-            break;
-        }
-        else
-        {
-            if (tmp <= 0)
-            {
-                return 0;
-            }
-            else
-            {
-                tmp--;
-            }
-        }
+  }
+  tmp = diff;
+  useTemp = 1;
+  for (i = x; i > 0; i--) {
+    // Check if the color of the pixel at position (i, j) is the same as the
+    // current color
+    if (renderlib_getpixel(i, y) == currentColor) {
+      break;
+    } else {
+      if (tmp <= 0) {
+        return 0;
+      } else {
+        tmp--;
+      }
     }
-    (*outX) = x + diff - tmp;
-    // Do the same for the y axis
-    diff = 0;
-    tmp = 0;
-    useTemp = 1;
-    for (i = y; i < 25; i++)
-    {
-        // Check if the color of the pixel at position (i, j) is the same as the current color
-        if (renderlib_getpixel(x, i) == currentColor)
-        {
-            break;
-        }
-        else
-        {
-            diff++;
-        }
+  }
+  (*outX) = x + diff - tmp;
+  // Do the same for the y axis
+  diff = 0;
+  tmp = 0;
+  useTemp = 1;
+  for (i = y; i < 25; i++) {
+    // Check if the color of the pixel at position (i, j) is the same as the
+    // current color
+    if (renderlib_getpixel(x, i) == currentColor) {
+      break;
+    } else {
+      diff++;
     }
-    tmp = diff;
-    for (i = y; i > 0; i--)
-    {
-        // Check if the color of the pixel at position (i, j) is the same as the current color
-        if (renderlib_getpixel(x, i) == currentColor)
-        {
-            break;
-        }
-        else
-        {
-            if (tmp <= 0)
-            {
-                return 0;
-            }
-            else
-            {
-                tmp--;
-            }
-        }
+  }
+  tmp = diff;
+  for (i = y; i > 0; i--) {
+    // Check if the color of the pixel at position (i, j) is the same as the
+    // current color
+    if (renderlib_getpixel(x, i) == currentColor) {
+      break;
+    } else {
+      if (tmp <= 0) {
+        return 0;
+      } else {
+        tmp--;
+      }
     }
-    (*outY) = y + diff - tmp;
-    return 1;
+  }
+  (*outY) = y + diff - tmp;
+  return 1;
 }
 
-void renderlib_fillrect(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char color)
-{
-    unsigned char i = 0;
-    unsigned char j = 0;
+void renderlib_fillrect(unsigned char x, unsigned char y, unsigned char w,
+                        unsigned char h, unsigned char color) {
+  unsigned char i = 0;
+  unsigned char j = 0;
 
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  if (renderMode == renderlib_mode_graphics) {
+    // Draw a filled rectangle
+    tgi_setcolor(color);
+    tgi_bar(x, y, x + w, y + h);
+  } else {
+#endif
+
+    for (i = 0; i < w; i++) {
+      for (j = 0; j < h; j++) {
+        renderlib_setpixel(x + i, y + j, color);
+      }
     }
 
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        // Draw a filled rectangle
-        tgi_setcolor(color);
-        tgi_bar(x, y, x + w, y + h);
-    }
-    else
-    {
+  }
+#endif
+}
+
+void renderlib_drawline(unsigned char x1, unsigned char y1, unsigned char x2,
+                        unsigned char y2, unsigned char thickness,
+                        unsigned char color) {
+  // Calculate the difference between the two points
+  unsigned char dx = x2 - x1;
+  unsigned char dy = y2 - y1;
+
+  // Calculate the slope without using a float (as it is not supported by CC65)
+  unsigned char m = dy / dx;
+
+  // Calculate the thickness
+  unsigned char t = thickness / 2;
+
+  // Calculate the thickness
+  unsigned char i = 0;
+  unsigned char j = 0;
+
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  if (renderMode == renderlib_mode_graphics) {
+    // Draw a line
+    tgi_setcolor(color);
+    tgi_line(x1, y1, x2, y2);
+  } else {
 #endif
 
-        for (i = 0; i < w; i++)
-        {
-            for (j = 0; j < h; j++)
-            {
-                renderlib_setpixel(x + i, y + j, color);
-            }
+    // Loop through the thickness
+    for (i = 0; i < t; i++) {
+      // Loop through the x-axis
+      for (j = 0; j < dx; j++) {
+        // Calculate the y-axis
+        unsigned char y = m * j + y1;
+        // Draw the pixel
+        renderlib_setpixel(x1 + j, y + i, color);
+        renderlib_setpixel(x1 + j, y - i, color);
+      }
+    }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  }
+#endif
+}
+
+void renderlib_fillcircle(unsigned char x, unsigned char y, unsigned char r,
+                          unsigned char color) {
+  unsigned char i = 0;
+  unsigned char j = 0;
+
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
+
+  for (i = 0; i < r; i++) {
+    for (j = 0; j < r; j++) {
+      if (i * i + j * j <= r * r) {
+        renderlib_setpixel(x + i, y + j, color);
+        renderlib_setpixel(x - i, y + j, color);
+        renderlib_setpixel(x + i, y - j, color);
+        renderlib_setpixel(x - i, y - j, color);
+      }
+    }
+  }
+}
+
+void renderlib_drawcirlce(unsigned char x, unsigned char y, unsigned char r,
+                          unsigned char color) {
+  unsigned char i = 0;
+  unsigned char j = 0;
+  int radiusSquared;
+
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
+
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  if (renderMode == renderlib_mode_graphics) {
+    // Draw a circle
+    tgi_setcolor(color);
+    tgi_circle(x, y, r);
+  } else {
+#endif
+
+    radiusSquared = r * r;
+    for (i = 0; i <= r; i++) {
+      for (j = 0; j <= r; j++) {
+        int distanceSquared = (i - r) * (i - r) + (j - r) * (j - r);
+        if (distanceSquared >= radiusSquared - 2 * r &&
+            distanceSquared <= radiusSquared + 2 * r) {
+          renderlib_setpixel(x + i, y + j, color);
+          renderlib_setpixel(x - i, y + j, color);
+          renderlib_setpixel(x + i, y - j, color);
+          renderlib_setpixel(x - i, y - j, color);
         }
-
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+      }
     }
+#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
+  }
 #endif
 }
 
-void renderlib_drawline(unsigned char x1, unsigned char y1, unsigned char x2, unsigned char y2, unsigned char thickness, unsigned char color)
-{
-    // Calculate the difference between the two points
-    unsigned char dx = x2 - x1;
-    unsigned char dy = y2 - y1;
+void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w,
+                          unsigned char h, unsigned char *sprite) {
+  unsigned char i = 0;
+  unsigned char j = 0;
 
-    // Calculate the slope without using a float (as it is not supported by CC65)
-    unsigned char m = dy / dx;
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
 
-    // Calculate the thickness
-    unsigned char t = thickness / 2;
-
-    // Calculate the thickness
-    unsigned char i = 0;
-    unsigned char j = 0;
-
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
+  for (i = 0; i < w; i++) {
+    for (j = 0; j < h; j++) {
+      renderlib_setpixel(x + i, y + j, sprite[i + j * w]);
     }
-
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        // Draw a line
-        tgi_setcolor(color);
-        tgi_line(x1, y1, x2, y2);
-    }
-    else
-    {
-#endif
-
-        // Loop through the thickness
-        for (i = 0; i < t; i++)
-        {
-            // Loop through the x-axis
-            for (j = 0; j < dx; j++)
-            {
-                // Calculate the y-axis
-                unsigned char y = m * j + y1;
-                // Draw the pixel
-                renderlib_setpixel(x1 + j, y + i, color);
-                renderlib_setpixel(x1 + j, y - i, color);
-            }
-        }
-
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    }
-#endif
+  }
 }
 
-void renderlib_fillcircle(unsigned char x, unsigned char y, unsigned char r, unsigned char color)
-{
-    unsigned char i = 0;
-    unsigned char j = 0;
-
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
-    }
-
-    for (i = 0; i < r; i++)
-    {
-        for (j = 0; j < r; j++)
-        {
-            if (i * i + j * j <= r * r)
-            {
-                renderlib_setpixel(x + i, y + j, color);
-                renderlib_setpixel(x - i, y + j, color);
-                renderlib_setpixel(x + i, y - j, color);
-                renderlib_setpixel(x - i, y - j, color);
-            }
-        }
-    }
-}
-
-void renderlib_drawcirlce(unsigned char x, unsigned char y, unsigned char r, unsigned char color)
-{
-    unsigned char i = 0;
-    unsigned char j = 0;
-    int radiusSquared;
-
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
-    }
-
+void renderlib_unload() {
+  if (hasBeenInitialized == 0) {
+    initErrorMsg();
+    return;
+  }
 #ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        // Draw a circle
-        tgi_setcolor(color);
-        tgi_circle(x, y, r);
-    }
-    else
-    {
+  if (renderMode == renderlib_mode_graphics) {
+    renderlib_setmode(renderlib_mode_text);
+  }
 #endif
-
-        radiusSquared = r * r;
-        for (i = 0; i <= r; i++)
-        {
-            for (j = 0; j <= r; j++)
-            {
-                int distanceSquared = (i - r) * (i - r) + (j - r) * (j - r);
-                if (distanceSquared >= radiusSquared - 2 * r && distanceSquared <= radiusSquared + 2 * r)
-                {
-                    renderlib_setpixel(x + i, y + j, color);
-                    renderlib_setpixel(x - i, y + j, color);
-                    renderlib_setpixel(x + i, y - j, color);
-                    renderlib_setpixel(x - i, y - j, color);
-                }
-            }
-        }
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    }
-#endif
+  renderlib_setcolor(color_light_blue1, color_blue1);
+  hasBeenInitialized = 0;
+  renderlib_clear();
 }
 
-void renderlib_drawsprite(unsigned char x, unsigned char y, unsigned char w, unsigned char h, unsigned char *sprite)
-{
-    unsigned char i = 0;
-    unsigned char j = 0;
-
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
-    }
-
-    for (i = 0; i < w; i++)
-    {
-        for (j = 0; j < h; j++)
-        {
-            renderlib_setpixel(x + i, y + j, sprite[i + j * w]);
-        }
-    }
-}
-
-void renderlib_unload()
-{
-    if (hasBeenInitialized == 0)
-    {
-        initErrorMsg();
-        return;
-    }
-#ifdef RENDERLIB_GRAPHICSMODE_INCLUDED
-    if (renderMode == renderlib_mode_graphics)
-    {
-        renderlib_setmode(renderlib_mode_text);
-    }
-#endif
-    renderlib_setcolor(color_light_blue1, color_blue1);
-    hasBeenInitialized = 0;
-    renderlib_clear();
-}
-
-void renderlib_init()
-{
-    if (hasBeenInitialized == 1)
-    {
-        initErrorMsg2();
-        return;
-    }
-    // renderlib_setmode(renderlib_mode_text);
-    renderlib_clear();
-    hasBeenInitialized = 1;
-    renderlib_setcolor(color_black1, color_black1);
+void renderlib_init() {
+  if (hasBeenInitialized == 1) {
+    initErrorMsg2();
+    return;
+  }
+  // renderlib_setmode(renderlib_mode_text);
+  renderlib_clear();
+  hasBeenInitialized = 1;
+  renderlib_setcolor(color_black1, color_black1);
 }
 
 #ifdef RENDERLIB3D_INCLUDED
 // RenderLib 3D Implementation //
 
-int cpos[3] = {0, 0, 0};
-int crot[3] = {0, 0, 0};
-int cscl[3] = {5, 5, 15}; // 10 = 1m
+#include <string.h>
 
-void renderlib3d_setcpos(int x, int y, int z)
-{
-    cpos[0] = x;
-    cpos[1] = y;
-    cpos[2] = z;
-}
+struct renderlib3d_camera *camera;
 
-void renderlib3d_setcrot(int x, int y, int z)
-{
-    crot[0] = x;
-    crot[1] = y;
-    crot[2] = z;
-}
+void renderlib3d_setcam(struct renderlib3d_camera *cam) { camera = cam; }
+struct renderlib3d_camera *renderlib3d_getcam() { return camera; }
 
-void renderlib3d_setcscl(int x, int y, int z)
-{
-    cscl[0] = x;
-    cscl[1] = y;
-    cscl[2] = z;
-}
-
-unsigned char cobj = 0;
 #define MAX_OBJECTS 32
-// unsigned char changeObjects[MAX_OBJECTS]; // Objects that have changed and need to be redrawn.
-unsigned char redrawRequired = 0; // If 1, redraw all objects.
-int objects[MAX_OBJECTS][11];     // TODO: Maybe increase or dynamiclly allocate somehow?
+struct renderlib3d_object *objects[MAX_OBJECTS];
 
-void renderlib3d_clear()
-{
-    unsigned char i;
+void renderlib3d_clear() {
+  unsigned char i;
 
-    // Default values reset //
-    cobj = 0;
-    for (i = 0; i < MAX_OBJECTS; i++)
-    {
-        memset(objects[i], 0, 44); // objects[11] --> 11 --> 11 * 4 (int) = 44
+  // Default values reset //
+  for (i = 0; i < MAX_OBJECTS; i++) {
+    if (objects[i] != NULL) {
+      free(objects[i]->pos);
+      free(objects[i]->rot);
+      free(objects[i]->scl);
+      free(objects[i]);
     }
-
-    redrawRequired = 1;
+    objects[i] = NULL;
+  }
 }
 
-void renderlib3d_reset()
-{
-    renderlib3d_clear();
-    renderlib3d_setcpos(0, 0, 0);
-    renderlib3d_setcrot(0, 0, 0);
-    renderlib3d_setcscl(5, 5, 15);
+void renderlib3d_reset() { renderlib3d_clear(); }
+
+void renderlib3d_init() {
+  if (hasBeenInitialized == 0) {
+    renderlib_init();
+  }
+  renderlib_setmode(renderlib_mode_graphics);
+
+  // Set the camera
+  camera = malloc(sizeof(struct renderlib3d_camera));
+  camera->pos = malloc(sizeof(struct renderlib3d_vector3));
+  camera->rot = malloc(sizeof(struct renderlib3d_vector3));
+  camera->scl = malloc(sizeof(struct renderlib3d_vector3));
+
+  camera->pos->x = 0;
+  camera->pos->y = 0;
+  camera->pos->z = 0;
+
+  camera->rot->x = 0;
+  camera->rot->y = 0;
+  camera->rot->z = 0;
+
+  camera->scl->x = 1;
+  camera->scl->y = 1;
+  camera->scl->z = 1;
+
+  renderlib3d_reset();
 }
 
-void renderlib3d_init()
-{
-    if (hasBeenInitialized == 0)
-    {
-        renderlib_init();
-    }
-    renderlib_setmode(renderlib_mode_graphics);
+void renderlib_project_point(int x, int y, int z, unsigned char *x2d,
+                             unsigned char *y2d) {
+  // Variables for fixed-point arithmetic
+  int fov = 256;           // Field of view, scaled up
+  int viewer_distance = 4; // Viewer distance, scaled up
+  int denominator;
+  int proj_x, proj_y;
 
-    renderlib3d_reset();
+  // Calculate projection
+  denominator = viewer_distance + z;
+  if (denominator == 0)
+    denominator = 1; // Prevent division by zero
+
+  proj_x = (fov * x) / denominator;
+  proj_y = (fov * y) / denominator;
+
+  *x2d = (unsigned char)(proj_x + 20); // Adjust x-coord to screen center
+  *y2d = (unsigned char)(proj_y + 12); // Adjust y-coord to screen center
 }
 
-/*
-SHAPES:
-0 = Cube
-1 = Pyramid (WIP)
-2 = Sphere (WIP)
-3 = Cylinder (WIP)
-4 = Cone (WIP)
-5 = Plane (WIP)
-*/
-unsigned char renderlib3d_draw(unsigned char shape, int posx, int posy, int posz, int rotx, int roty, int rotz, int sclx, int scly, int sclz, unsigned char color)
-{
-    int values[10];
+struct renderlib3d_object *renderlib3d_createobj(unsigned char shape) {
+  unsigned char cobj;
+  struct renderlib3d_object *obj = malloc(sizeof(struct renderlib3d_object));
+
+  if (obj == NULL) {
+    return NULL;
+  }
+
+  // Find the first available object slot
+  cobj = 0;
+  while (objects[cobj] != NULL && cobj < MAX_OBJECTS) {
     cobj++;
-    values[0] = shape; // TODO: Can we reduce the amount of bytes used for this? (Maybe 1 byte for shape somehow? (instead of 4))
-    values[1] = posx;
-    values[2] = posy;
-    values[3] = posz;
-    values[4] = rotx;
-    values[5] = roty;
-    values[6] = rotz;
-    values[7] = sclx;
-    values[8] = scly;
-    values[9] = sclz;
-    values[10] = color;
-    memcpy(objects[cobj], values, 9);
-    return cobj;
+  }
+
+  if (cobj >= MAX_OBJECTS && objects[cobj] != NULL) {
+    free(obj);
+    return NULL;
+  }
+
+  obj->shape = shape;
+  obj->dirty = 1;
+  obj->pos = malloc(sizeof(struct renderlib3d_vector3));
+  obj->rot = malloc(sizeof(struct renderlib3d_vector3));
+  obj->scl = malloc(sizeof(struct renderlib3d_vector3));
+
+  obj->pos->x = 0;
+  obj->pos->y = 0;
+  obj->pos->z = 0;
+
+  obj->rot->x = 0;
+  obj->rot->y = 0;
+  obj->rot->z = 0;
+
+  obj->scl->x = 1;
+  obj->scl->y = 1;
+  obj->scl->z = 1;
+
+  obj->id = cobj;
+
+  objects[obj->id] = obj;
+
+  return obj;
 }
 
-void enqueue_redraw(unsigned char obj)
-{
-    redrawRequired = 1;
+void renderlib3d_destroyobj(struct renderlib3d_object *obj) {
+  if (obj == NULL) {
+    return;
+  }
+
+  free(obj->pos);
+  free(obj->rot);
+  free(obj->scl);
+
+  // remove from objects array
+  objects[obj->id] = NULL;
+
+  free(obj);
 }
 
-void renderlib3d_setpos(unsigned char obj, int x, int y, int z)
-{
-    objects[obj][1] = x;
-    objects[obj][2] = y;
-    objects[obj][3] = z;
-    enqueue_redraw(obj);
-}
+void renderlib3d_render() {
+  // Declare all variables at the beginning
+  unsigned char shape;
+  struct renderlib3d_vector3 *pos, *rot, *scl;
+  int vertices[8][3];
+  int v1[3], v2[3], v3[3], v4[3];
+  unsigned char x2d[8], y2d[8];
+  unsigned char edges[12][2];
+  unsigned char color;
+  int half_sclx, half_scly, half_sclz;
+  int segments, angle_step;
+  int phi1, phi2;
+  int theta1, theta2;
+  int base_x, base_y, base_z;
+  int apex[3];
+  unsigned char x2d_temp[3], y2d_temp[3];
+  int i, j, e, k, v;
+  int radius, height;
+  int cos_theta1, sin_theta1, cos_theta2, sin_theta2, cos_phi1, sin_phi1,
+      cos_phi2, sin_phi2;
 
-void renderlib3d_setrot(unsigned char obj, int x, int y, int z)
-{
-    objects[obj][4] = x;
-    objects[obj][5] = y;
-    objects[obj][6] = z;
-    enqueue_redraw(obj);
-}
+  // Get camera position, rotation, scale
+  struct renderlib3d_vector3 *cam_pos = camera->pos;
+  struct renderlib3d_vector3 *cam_rot = camera->rot;
+  struct renderlib3d_vector3 *cam_scl = camera->scl;
 
-void renderlib3d_setscl(unsigned char obj, int x, int y, int z)
-{
-    objects[obj][7] = x;
-    objects[obj][8] = y;
-    objects[obj][9] = z;
-    enqueue_redraw(obj);
-}
+  // Loop through all objects
+  for (k = 0; k < MAX_OBJECTS; k++) {
+    // Get the object
+    struct renderlib3d_object *obj = objects[k];
 
-void renderlib3d_setshape(unsigned char obj, unsigned char shape)
-{
-    objects[obj][0] = shape;
-    enqueue_redraw(obj);
-}
-
-void renderlib3d_render()
-{
-    int *obj;
-    unsigned char shape;
-    int posx, posy, posz;
-    int rotx, roty, rotz;
-    int sclx, scly, sclz;
-    unsigned char color;
-
-    // Loop through all objects
-    unsigned char i;
-
-    if (!redrawRequired)
-    {
-        return;
+    if (obj == NULL || obj->dirty == 0) {
+      continue;
     }
 
-    for (i = 0; i < cobj; i++)
-    {
-        // Get the object
-        obj = objects[i];
-        // Get the shape
-        shape = obj[0];
-        // Get the position
-        posx = obj[1];
-        posy = obj[2];
-        posz = obj[3];
-        // Get the rotation
-        rotx = obj[4];
-        roty = obj[5];
-        rotz = obj[6];
-        // Get the scale
-        sclx = obj[7];
-        scly = obj[8];
-        sclz = obj[9];
-        // Get the color
-        color = obj[10];
+    // Get the shape
+    shape = obj->shape;
 
-        // Draw it!
-        switch (shape)
-        {
-        case 0: // Cube
-            // void renderlib_drawline(unsigned char x1, unsigned char y1, unsigned char x2, unsigned char y2, unsigned char thickness, unsigned char color)
-            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
-            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
-            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
-            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+    // Get the position, rotation, scale
+    pos = obj->pos;
+    rot = obj->rot;
+    scl = obj->scl;
 
-            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
-            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
-            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
-            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+    // Get the color (default or from object if available)
+    color = obj->color; // Set a default color or get from object if available
 
-            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
-            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
-            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
-            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+    // Draw it!
+    switch (shape) {
+    case 0: // Cube
+      half_sclx = scl->x / 2;
+      half_scly = scl->y / 2;
+      half_sclz = scl->z / 2;
 
-            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
-            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
-            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
-            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+      // Define vertices for the cube
+      vertices[0][0] = pos->x - half_sclx;
+      vertices[0][1] = pos->y - half_scly;
+      vertices[0][2] = pos->z - half_sclz;
+      vertices[1][0] = pos->x + half_sclx;
+      vertices[1][1] = pos->y - half_scly;
+      vertices[1][2] = pos->z - half_sclz;
+      vertices[2][0] = pos->x + half_sclx;
+      vertices[2][1] = pos->y + half_scly;
+      vertices[2][2] = pos->z - half_sclz;
+      vertices[3][0] = pos->x - half_sclx;
+      vertices[3][1] = pos->y + half_scly;
+      vertices[3][2] = pos->z - half_sclz;
+      vertices[4][0] = pos->x - half_sclx;
+      vertices[4][1] = pos->y - half_scly;
+      vertices[4][2] = pos->z + half_sclz;
+      vertices[5][0] = pos->x + half_sclx;
+      vertices[5][1] = pos->y - half_scly;
+      vertices[5][2] = pos->z + half_sclz;
+      vertices[6][0] = pos->x + half_sclx;
+      vertices[6][1] = pos->y + half_scly;
+      vertices[6][2] = pos->z + half_sclz;
+      vertices[7][0] = pos->x - half_sclx;
+      vertices[7][1] = pos->y + half_scly;
+      vertices[7][2] = pos->z + half_sclz;
 
-            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
-            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
-            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
-            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+      for (v = 0; v < 8; v++) {
+        renderlib_project_point(vertices[v][0], vertices[v][1], vertices[v][2],
+                                &x2d[v], &y2d[v]);
+      }
 
-            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
-            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
-            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
-            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+      // Define edges for the cube
+      edges[0][0] = 0;
+      edges[0][1] = 1;
+      edges[1][0] = 1;
+      edges[1][1] = 2;
+      edges[2][0] = 2;
+      edges[2][1] = 3;
+      edges[3][0] = 3;
+      edges[3][1] = 0;
+      edges[4][0] = 4;
+      edges[4][1] = 5;
+      edges[5][0] = 5;
+      edges[5][1] = 6;
+      edges[6][0] = 6;
+      edges[6][1] = 7;
+      edges[7][0] = 7;
+      edges[7][1] = 4;
+      edges[8][0] = 0;
+      edges[8][1] = 4;
+      edges[9][0] = 1;
+      edges[9][1] = 5;
+      edges[10][0] = 2;
+      edges[10][1] = 6;
+      edges[11][0] = 3;
+      edges[11][1] = 7;
 
-            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
-            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
-            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
-            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+      for (e = 0; e < 12; e++) {
+        renderlib_drawline(x2d[edges[e][0]], y2d[edges[e][0]], x2d[edges[e][1]],
+                           y2d[edges[e][1]], 1, color);
+      }
+      break;
 
-            renderlib_drawline(posx, posy, posx + sclx, posy, 1, color);
-            renderlib_drawline(posx, posy, posx, posy + scly, 1, color);
-            renderlib_drawline(posx, posy + scly, posx + sclx, posy + scly, 1, color);
-            renderlib_drawline(posx + sclx, posy, posx + sclx, posy + scly, 1, color);
+    case 1: // Pyramid
+      half_sclx = scl->x / 2;
+      half_scly = scl->y / 2;
+      half_sclz = scl->z / 2;
 
-            break;
-        default:
-            //
-            break;
+      // Define vertices for the pyramid
+      apex[0] = pos->x;
+      apex[1] = pos->y - half_scly;
+      apex[2] = pos->z;
+
+      vertices[0][0] = apex[0];
+      vertices[0][1] = apex[1];
+      vertices[0][2] = apex[2];
+      vertices[1][0] = pos->x + half_sclx;
+      vertices[1][1] = pos->y + half_scly;
+      vertices[1][2] = pos->z + half_sclz;
+      vertices[2][0] = pos->x - half_sclx;
+      vertices[2][1] = pos->y + half_scly;
+      vertices[2][2] = pos->z + half_sclz;
+      vertices[3][0] = pos->x - half_sclx;
+      vertices[3][1] = pos->y + half_scly;
+      vertices[3][2] = pos->z - half_sclz;
+      vertices[4][0] = pos->x + half_sclx;
+      vertices[4][1] = pos->y + half_scly;
+      vertices[4][2] = pos->z - half_sclz;
+
+      for (v = 0; v < 5; v++) {
+        renderlib_project_point(vertices[v][0], vertices[v][1], vertices[v][2],
+                                &x2d[v], &y2d[v]);
+      }
+
+      // Define edges for the pyramid
+      edges[0][0] = 0;
+      edges[0][1] = 1;
+      edges[1][0] = 0;
+      edges[1][1] = 2;
+      edges[2][0] = 0;
+      edges[2][1] = 3;
+      edges[3][0] = 0;
+      edges[3][1] = 4;
+      edges[4][0] = 1;
+      edges[4][1] = 2;
+      edges[5][0] = 2;
+      edges[5][1] = 3;
+      edges[6][0] = 3;
+      edges[6][1] = 4;
+      edges[7][0] = 4;
+      edges[7][1] = 1;
+
+      for (e = 0; e < 8; e++) {
+        renderlib_drawline(x2d[edges[e][0]], y2d[edges[e][0]], x2d[edges[e][1]],
+                           y2d[edges[e][1]], 1, color);
+      }
+      break;
+
+    case 2: // Sphere
+      segments = 8;
+      angle_step = 256 / segments;
+
+      for (i = 0; i < segments; ++i) {
+        for (j = 0; j < segments; ++j) {
+          theta1 = i * angle_step;
+          theta2 = (i + 1) * angle_step;
+          phi1 = j * angle_step;
+          phi2 = (j + 1) * angle_step;
+
+          cos_theta1 = cos(theta1) * 256;
+          sin_theta1 = sin(theta1) * 256;
+          cos_theta2 = cos(theta2) * 256;
+          sin_theta2 = sin(theta2) * 256;
+          cos_phi1 = cos(phi1) * 256;
+          sin_phi1 = sin(phi1) * 256;
+          cos_phi2 = cos(phi2) * 256;
+          sin_phi2 = sin(phi2) * 256;
+
+          v1[0] = pos->x + (scl->x * sin_phi1 * cos_theta1) / 256;
+          v1[1] = pos->y + (scl->y * cos_phi1) / 256;
+          v1[2] = pos->z + (scl->z * sin_phi1 * sin_theta1) / 256;
+
+          v2[0] = pos->x + (scl->x * sin_phi1 * cos_theta2) / 256;
+          v2[1] = pos->y + (scl->y * cos_phi1) / 256;
+          v2[2] = pos->z + (scl->z * sin_phi1 * sin_theta2) / 256;
+
+          v3[0] = pos->x + (scl->x * sin_phi2 * cos_theta1) / 256;
+          v3[1] = pos->y + (scl->y * cos_phi2) / 256;
+          v3[2] = pos->z + (scl->z * sin_phi2 * sin_theta1) / 256;
+
+          v4[0] = pos->x + (scl->x * sin_phi2 * cos_theta2) / 256;
+          v4[1] = pos->y + (scl->y * cos_phi2) / 256;
+          v4[2] = pos->z + (scl->z * sin_phi2 * sin_theta2) / 256;
+
+          renderlib_project_point(v1[0], v1[1], v1[2], &x2d_temp[0],
+                                  &y2d_temp[0]);
+          renderlib_project_point(v2[0], v2[1], v2[2], &x2d_temp[1],
+                                  &y2d_temp[1]);
+          renderlib_project_point(v3[0], v3[1], v3[2], &x2d_temp[2],
+                                  &y2d_temp[2]);
+
+          renderlib_drawline(x2d_temp[0], y2d_temp[0], x2d_temp[1], y2d_temp[1],
+                             1, color);
+          renderlib_drawline(x2d_temp[1], y2d_temp[1], x2d_temp[2], y2d_temp[2],
+                             1, color);
+          renderlib_drawline(x2d_temp[2], y2d_temp[2], x2d_temp[0], y2d_temp[0],
+                             1, color);
         }
+      }
+      break;
+
+    case 3: // Cylinder
+      segments = 8;
+      angle_step = 256 / segments;
+
+      for (i = 0; i < segments; ++i) {
+        theta1 = i * angle_step;
+        theta2 = (i + 1) * angle_step;
+
+        v1[0] = pos->x + (scl->x * cos(theta1)) / 256;
+        v1[1] = pos->y + (scl->y);
+        v1[2] = pos->z + (scl->z * sin(theta1)) / 256;
+
+        v2[0] = pos->x + (scl->x * cos(theta2)) / 256;
+        v2[1] = pos->y + (scl->y);
+        v2[2] = pos->z + (scl->z * sin(theta2)) / 256;
+
+        renderlib_project_point(v1[0], v1[1], v1[2], &x2d_temp[0],
+                                &y2d_temp[0]);
+        renderlib_project_point(v2[0], v2[1], v2[2], &x2d_temp[1],
+                                &y2d_temp[1]);
+
+        renderlib_drawline(x2d_temp[0], y2d_temp[0], x2d_temp[1], y2d_temp[1],
+                           1, color);
+      }
+      break;
+
+    case 4: // Cone
+      segments = 8;
+      angle_step = 256 / segments;
+
+      // Draw base circle
+      for (i = 0; i < segments; ++i) {
+        theta1 = i * angle_step;
+        theta2 = (i + 1) * angle_step;
+
+        v1[0] = pos->x + (scl->x * cos(theta1)) / 256;
+        v1[1] = pos->y + (scl->y - scl->y / 2);
+        v1[2] = pos->z + (scl->z * sin(theta1)) / 256;
+
+        v2[0] = pos->x + (scl->x * cos(theta2)) / 256;
+        v2[1] = pos->y + (scl->y - scl->y / 2);
+        v2[2] = pos->z + (scl->z * sin(theta2)) / 256;
+
+        renderlib_project_point(v1[0], v1[1], v1[2], &x2d_temp[0],
+                                &y2d_temp[0]);
+        renderlib_project_point(v2[0], v2[1], v2[2], &x2d_temp[1],
+                                &y2d_temp[1]);
+
+        renderlib_drawline(x2d_temp[0], y2d_temp[0], x2d_temp[1], y2d_temp[1],
+                           1, color);
+      }
+
+      // Draw cone lines
+      for (i = 0; i < segments; ++i) {
+        theta1 = i * angle_step;
+
+        v1[0] = pos->x + (scl->x * cos(theta1)) / 256;
+        v1[1] = pos->y + (scl->y - scl->y / 2);
+        v1[2] = pos->z + (scl->z * sin(theta1)) / 256;
+
+        renderlib_project_point(v1[0], v1[1], v1[2], &x2d_temp[0],
+                                &y2d_temp[0]);
+        renderlib_drawline(x2d_temp[0], y2d_temp[0], x2d_temp[0],
+                           y2d_temp[0] - 16, 1, color); // Draw cone lines
+      }
+      break;
+
+    case 5: // Plane
+      vertices[0][0] = pos->x - scl->x;
+      vertices[0][1] = pos->y;
+      vertices[0][2] = pos->z - scl->z;
+      vertices[1][0] = pos->x + scl->x;
+      vertices[1][1] = pos->y;
+      vertices[1][2] = pos->z - scl->z;
+      vertices[2][0] = pos->x + scl->x;
+      vertices[2][1] = pos->y;
+      vertices[2][2] = pos->z + scl->z;
+      vertices[3][0] = pos->x - scl->x;
+      vertices[3][1] = pos->y;
+      vertices[3][2] = pos->z + scl->z;
+
+      for (v = 0; v < 4; v++) {
+        renderlib_project_point(vertices[v][0], vertices[v][1], vertices[v][2],
+                                &x2d[v], &y2d[v]);
+      }
+
+      // Draw plane edges
+      renderlib_drawline(x2d[0], y2d[0], x2d[1], y2d[1], 1, color);
+      renderlib_drawline(x2d[1], y2d[1], x2d[2], y2d[2], 1, color);
+      renderlib_drawline(x2d[2], y2d[2], x2d[3], y2d[3], 1, color);
+      renderlib_drawline(x2d[3], y2d[3], x2d[0], y2d[0], 1, color);
+      break;
+
+    default:
+      // Unknown shape
+      break;
     }
+
+    obj->dirty = 0;
+  }
 }
 
-// End of section //
-#endif
+#endif // RENDERLIB3D_INCLUDED

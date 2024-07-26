@@ -15,6 +15,7 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include "multidore64/soundlib.h"
 #include "multidore64/colorlib.h"
 #include "multidore64/controllerlib.h"
+#include "multidore64/utilslib.h"
 #include <conio.h>
 
 char max_x = 39, max_y = 24;
