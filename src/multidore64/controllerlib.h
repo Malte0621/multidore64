@@ -1,4 +1,4 @@
-#include <joystick.h>
+#include <c64/joystick.h>
 
 void controller_init(void);
 unsigned char controller_joy_up(unsigned char port);

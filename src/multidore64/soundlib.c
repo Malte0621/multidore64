@@ -11,8 +11,7 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include <stdlib.h>
 #include <string.h>
 #include "soundlib.h"
-#include <c64.h>
-#include <peekpoke.h>
+#include <c64/sid.h>
 #include "utilslib.h"
 
 struct SIDHeader
@@ -49,18 +48,18 @@ unsigned int SIDLOAD = 0x4000;
 unsigned int SIDSIZE = 6144;
 // unsigned char SIDBAK[6144];
 
-extern void SIDINIT(); 
+extern void SIDINIT();
 extern void SIDPLAY();
 extern void SIDSTOP();
 
 void soundlib_init()
 {
-	
+
 }
 
 void soundlib_play(char FILEDATA[]){
 	// memcpy((void*)(SIDBAK),(void*)SIDLOAD,SIDSIZE);
-	memcpy((void*)(SIDLOAD),(void*)FILEDATA,SIDSIZE);
+	memcpy((void *)(SIDLOAD),(void *)FILEDATA,SIDSIZE);
     SIDINIT();
     SIDPLAY();
 }
@@ -69,9 +68,9 @@ void soundlib_stop()
 {
 	// Stop the SID
 	SIDSTOP();
-	SID.v1.ctrl  = 0x40;
-	SID.v2.ctrl  = 0x40;
-	SID.v3.ctrl  = 0x40;
+	sid.voices[0].ctrl  = SID_CTRL_RECT;
+	sid.voices[1].ctrl  = SID_CTRL_RECT;
+	sid.voices[2].ctrl  = SID_CTRL_RECT;
 	// Restore the original SID data
 	// memcpy((void*)(SIDLOAD),(void*)(SIDBAK),SIDSIZE);
 }

@@ -11,7 +11,5 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #define UTILSLIB_H
 
 void sleep(unsigned int ns);
-int cos(int angle);
-int sin(int angle);
 
 #endif

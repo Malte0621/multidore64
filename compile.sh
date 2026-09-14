@@ -1,79 +1,107 @@
-rm -rf build
-rm -rf dist
-# Check if the build directory doesn't exist
-if [ ! -d ../build ]; then
-    mkdir build >/dev/null
-fi
-cd src
-# Loop through all .c files in the current directory
-for file in *.c
-do
-    # Compile each .c file into a .s file
-    cc65 -O -o ../build/${file}.s -t c64 $file
-done
+#!/bin/bash
+# MultiDore 64 build script (oscar64)
+# oscar64 is a whole-program optimizing C compiler for the 6502.
+# It compiles, assembles, and links in a single pass.
+#
+# Usage:
+#   ./compile.sh          - build .prg only (default)
+#   ./compile.sh prg      - build .prg
+#   ./compile.sh crt      - build cartridge (.crt)
+#   ./compile.sh tap      - build tape image (.tap)
+#   ./compile.sh all      - build all formats
 
-for file in *.s
-do
-    # Copy each .s file into the build directory
-    cp $file ../build
-done
+set -e
 
-for file in *.bin
-do
-    # Copy each .bin file into the build directory
-    cp $file ../build
-done
-
-# check if ANY .cfg file exists in the current directory
-if [ -f *.cfg ]; then
-    for file in *.cfg
-    do
-        # Copy each .cfg file into the build directory
-        cp $file ../build
+# Find oscar64 - check for working installation (binary + includes)
+OSCAR64="${OSCAR64:-}"
+if [ -z "$OSCAR64" ]; then
+    for candidate in oscar64 /bin/oscar64 /usr/bin/oscar64 /usr/local/bin/oscar64 /tmp/oscar64/bin/oscar64; do
+        if command -v "$candidate" &>/dev/null || [ -x "$candidate" ]; then
+            OSCAR64="$candidate"
+            break
+        fi
     done
 fi
-
-cd ../build
-
-# Loop through all .s files in the build directory
-for file in *.s
-do
-    # Assemble each .s file into a .o file
-    ca65 -o ${file}.o $file
-done
-
-# Check if the dist directory doesn't exist
-if [ ! -d ../dist ]; then
-    # Create the dist directory
-    mkdir ../dist >/dev/null
-fi
-
-# Link all .o files into a .prg file
-# ld65 -o ../dist/main -t c64 main.o c64.lib
-# Loop through all .o files in the build directory and add them to the link command
-obj_files=""
-for file in *.o
-do
-    obj_files="$obj_files $file"
-done
-
-# Check if c64.cfg exists in the current directory
-if [ -f c64.cfg ]; then
-    # Link all .o files into a .prg file
-    ld65 -C c64.cfg -o ../dist/main.prg $obj_files c64.lib
-else
-    # Link all .o files into a .prg file
-    ld65 -o ../dist/main.prg -t c64 $obj_files c64.lib
-fi
-
-if [ -f ../dist/main.prg ]; then
-    # Print a success message
-    echo "Build successful!"
-    # Exit with a success code
-    exit 0
-else
-    # Print an error message
-    echo "Build failed!"
-    # Exit with an error code
+if [ -z "$OSCAR64" ]; then
+    echo "Error: oscar64 not found."
+    echo "Install oscar64 or set OSCAR64 env var to the binary path."
     exit 1
 fi
+
+# Cartridge settings
+CARTRIDGE_NAME="MULTIDORE64"
+CARTRIDGE_ID=0x01
+CARTRIDGE_SUB=0x00
+
+# Clean previous build artifacts
+rm -rf build
+rm -rf dist
+mkdir -p dist
+
+cd src
+
+# Collect all source files (main.c + multidore64/*.c)
+sources="main.c"
+for file in multidore64/*.c; do
+    sources="$sources $file"
+done
+
+# oscar64 common flags
+FLAGS="-O3 -Oo -tm=c64"
+
+build_prg() {
+    echo "Building PRG..."
+    $OSCAR64 $FLAGS -tf=prg -o=../dist/main.prg $sources
+    echo "  -> dist/main.prg ($(stat -c '%s' ../dist/main.prg) bytes)"
+}
+
+build_crt() {
+    echo "Building cartridge..."
+    $OSCAR64 $FLAGS -tf=crt -cname="$CARTRIDGE_NAME" -cid=$CARTRIDGE_ID -csub=$CARTRIDGE_SUB -o=../dist/main.crt $sources
+    echo "  -> dist/main.crt ($(stat -c '%s' ../dist/main.crt) bytes)"
+}
+
+build_tap() {
+    echo "Building tape image..."
+    $OSCAR64 $FLAGS -tf=bin -o=../dist/main.bin $sources
+    python3 -c "
+data = open('../dist/main.bin', 'rb').read()
+name = b'MAIN          '
+addr = 0x0801
+msg = b'\x00\x00\x00\x00' + b'\x00\x00\x00\x00' + b'\x00' + bytes([len(name)]) + name + b'\x00'
+hdr = b'\x00\x00\x00\x00' + b'\x00\x00\x00\x00' + b'\x10' + bytes([addr & 0xFF, (addr >> 8) & 0xFF]) + b'\x00'
+with open('../dist/main.tap', 'wb') as f:
+    f.write(msg)
+    f.write(hdr)
+    f.write(data)
+"
+    rm -f ../dist/main.bin
+    echo "  -> dist/main.tap ($(stat -c '%s' ../dist/main.tap) bytes)"
+}
+
+# Determine what to build
+target="${1:-prg}"
+
+case "$target" in
+    prg)
+        build_prg
+        ;;
+    crt)
+        build_crt
+        ;;
+    tap)
+        build_tap
+        ;;
+    all)
+        build_prg
+        build_crt
+        build_tap
+        ;;
+    *)
+        echo "Unknown target: $target"
+        echo "Usage: $0 [prg|crt|tap|all]"
+        exit 1
+        ;;
+esac
+
+echo "Build successful!"

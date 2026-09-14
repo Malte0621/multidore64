@@ -16,7 +16,6 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include "multidore64/colorlib.h"
 #include "multidore64/controllerlib.h"
 #include "multidore64/utilslib.h"
-#include <conio.h>
 
 char max_x = 39, max_y = 24;
 
@@ -44,7 +43,7 @@ void draw(unsigned char x, unsigned char y, unsigned char color)
 {
     if (color != player1_character_color && color != player2_character_color)
         map[x][y] = color;
-    renderlib_setpixel(x, y, color);
+    renderlib_plot(x, y, color);
 }
 
 unsigned char isInColor(unsigned char x, unsigned char y, unsigned char color)
@@ -74,7 +73,7 @@ void resetGame()
     p2_y = 0;
     p1_lastDir = 0;
     p2_lastDir = 0;
-    renderlib_clear();
+    renderlib_clear(0);
 }
 
 void replaceColor(unsigned char color, unsigned char color2)
@@ -390,7 +389,6 @@ void handleInput(unsigned char port)
 
 int main(void)
 {
-    char debug = 1;
     int timeLeft = 240;
     int p1Score = 0;
     int p2Score = 0;
@@ -412,28 +410,13 @@ int main(void)
         }
     }
     soundlib_stop();
-    renderlib_clear();
+    renderlib_clear(0);
 
     resetGame();
 
     // Game Loop
     while (1)
     {
-        if (debug)
-        {
-            char *timeLeftStr = malloc(24);
-            char *p1state = malloc(20);
-            char *p1nd = malloc(16);
-
-            sprintf(timeLeftStr, "time left: %i", timeLeft);
-            renderlib_drawstring(0, 1, color_white, timeLeftStr);
-
-            sprintf(p1state, "player 1 state: %i", p1_lastDir);
-            renderlib_drawstring(0, 2, color_white, p1state);
-
-            sprintf(p1nd, "player 1 nd: %i", p1_nd);
-            renderlib_drawstring(0, 3, color_white, p1nd);
-        }
 
         // check if the letter "Q" was pressed
         if (controller_ispressed(0x51)) // TODO: Correct this.
@@ -470,7 +453,7 @@ int main(void)
                     }
                 }
             }
-            renderlib_clear();
+    renderlib_clear(0);
             if (p1Score > p2Score)
             {
                 // Player 1 wins

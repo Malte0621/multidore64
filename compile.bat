@@ -1,59 +1,105 @@
 @echo off
 setlocal enabledelayedexpansion
-rmdir /s /q build
-rmdir /s /q dist
-mkdir build 2>nul
+rem MultiDore 64 build script (oscar64)
+rem oscar64 is a whole-program optimizing C compiler for the 6502.
+rem It compiles, assembles, and links in a single pass.
+rem
+rem Usage:
+rem   compile.bat          - build .prg only (default)
+rem   compile.bat prg      - build .prg
+rem   compile.bat crt      - build cartridge (.crt)
+rem   compile.bat tap      - build tape image (.tap)
+rem   compile.bat all      - build all formats
+
+rem Cartridge settings
+set CARTRIDGE_NAME=MULTIDORE64
+set CARTRIDGE_ID=1
+set CARTRIDGE_SUB=0
+
+rem Clean previous build artifacts
+rmdir /s /q build 2>nul
+rmdir /s /q dist 2>nul
+mkdir dist 2>nul
+
 cd src
-:: Loop through all .c files in the current directory and subdirectories
-for /r %%F in (*.c) do (
-    :: Compile each .c file into a .s file
-    set filename=%%~nxF
-    cc65 -O -o ..\build\!filename!.s -t c64 %%F
+
+rem Collect all source files (main.c + multidore64\*.c)
+set sources=main.c
+for %%F in (multidore64\*.c) do (
+    set sources=!sources! %%F
 )
 
-for /r %%F in (*.s) do (
-    :: Copy each .s file into the build directory
-    set filename=%%~nxF
-    copy %%F ..\build\!filename!
-)
-for %%F in (*.bin) do (
-    :: Copy each .bin file into the build directory
-    copy %%F ..\build\%%F
-)
-for %%F in (*.cfg) do (
-    :: Copy each .cfg file into the build directory
-    copy %%F ..\build\%%F
-)
-cd ..\build
-:: Loop through all .s files in the build directory
-for %%f in (*.s) do (
-    :: Compile each .s file into a .o file
-    ca65 -o %%f.o %%f
-)
-mkdir ..\dist 2>nul
-:: Link all .o files into a .prg file
-:: ld65 -o ../dist/main -t c64 main.o c64.lib
-:: Loop through all .o files in the build directory and add them to the link command
-set files=
-for %%f in (*.o) do (
-    set files=!files! %%f
-)
+rem oscar64 common flags
+set FLAGS=-O3 -Oo -tm=c64
 
-: Check if c64.cfg exist in the build directory
-if exist c64.cfg (
-    :: Link all .o files into a .prg file
-    ld65 -C c64.cfg -o ../dist/main.prg %files% c64.lib
+rem Determine what to build
+set target=%1
+if "%target%"=="" set target=prg
+
+if /i "%target%"=="prg" goto build_prg
+if /i "%target%"=="crt" goto build_crt
+if /i "%target%"=="tap" goto build_tap
+if /i "%target%"=="all" goto build_all
+echo Unknown target: %target%
+echo Usage: %~nx0 [prg^|crt^|tap^|all]
+exit /b 1
+
+:build_prg
+echo Building PRG...
+oscar64 %FLAGS% -tf=prg -o=..\dist\main.prg !sources!
+if exist ..\dist\main.prg (
+    echo   -^> dist\main.prg
+    echo Build successful!
+    exit /b 0
 ) else (
-    :: Link all .o files into a .prg file
-    ld65 -o ../dist/main.prg -t c64 %files% c64.lib
-)
-
-:: Check if any "Error" were printed
-if not exist ../dist/main.prg (
-    :: Print the error message
     echo Build failed!
-    :: Exit with error code
     exit /b 1
 )
-:: Print the success message
-echo Build succeeded.
+
+:build_crt
+echo Building cartridge...
+oscar64 %FLAGS% -tf=crt -cname=%CARTRIDGE_NAME% -cid=%CARTRIDGE_ID% -csub=%CARTRIDGE_SUB% -o=..\dist\main.crt !sources!
+if exist ..\dist\main.crt (
+    echo   -^> dist\main.crt
+    echo Build successful!
+    exit /b 0
+) else (
+    echo Build failed!
+    exit /b 1
+)
+
+:build_tap
+echo Building tape image...
+oscar64 %FLAGS% -tf=bin -o=..\dist\main.bin !sources!
+if not exist ..\dist\main.bin (
+    echo Build failed!
+    exit /b 1
+)
+rem Create .tap file from the binary using Python
+python -c "data=open(r'..\dist\main.bin','rb').read(); name=b'MAIN          '; addr=0x0801; msg=b'\x00\x00\x00\x00'+b'\x00\x00\x00\x00'+b'\x00'+bytes([len(name)])+name+b'\x00'; hdr=b'\x00\x00\x00\x00'+b'\x00\x00\x00\x00'+b'\x10'+bytes([addr&0xFF,(addr>>8)&0xFF])+b'\x00'; f=open(r'..\dist\main.tap','wb'); f.write(msg); f.write(hdr); f.write(data); f.close()"
+if %errorlevel% neq 0 (
+    rem Fallback: just copy the bin to tap
+    copy ..\dist\main.bin ..\dist\main.tap >nul
+)
+del ..\dist\main.bin 2>nul
+if exist ..\dist\main.tap (
+    echo   -^> dist\main.tap
+    echo Build successful!
+    exit /b 0
+) else (
+    echo Build failed!
+    exit /b 1
+)
+
+:build_all
+echo Building all formats...
+oscar64 %FLAGS% -tf=prg -o=..\dist\main.prg !sources!
+echo   -^> dist\main.prg
+oscar64 %FLAGS% -tf=crt -cname=%CARTRIDGE_NAME% -cid=%CARTRIDGE_ID% -csub=%CARTRIDGE_SUB% -o=..\dist\main.crt !sources!
+echo   -^> dist\main.crt
+oscar64 %FLAGS% -tf=bin -o=..\dist\main.bin !sources!
+python -c "data=open(r'..\dist\main.bin','rb').read(); name=b'MAIN          '; addr=0x0801; msg=b'\x00\x00\x00\x00'+b'\x00\x00\x00\x00'+b'\x00'+bytes([len(name)])+name+b'\x00'; hdr=b'\x00\x00\x00\x00'+b'\x00\x00\x00\x00'+b'\x10'+bytes([addr&0xFF,(addr>>8)&0xFF])+b'\x00'; f=open(r'..\dist\main.tap','wb'); f.write(msg); f.write(hdr); f.write(data); f.close()"
+del ..\dist\main.bin 2>nul
+echo   -^> dist\main.tap
+echo Build successful!
+exit /b 0
