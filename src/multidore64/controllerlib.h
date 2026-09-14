@@ -1,6 +1,7 @@
 #include <c64/joystick.h>
 
 void controller_init(void);
+void controller_poll(unsigned char port);
 unsigned char controller_joy_up(unsigned char port);
 unsigned char controller_joy_down(unsigned char port);
 unsigned char controller_joy_left(unsigned char port);

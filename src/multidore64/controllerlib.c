@@ -9,33 +9,36 @@ void controller_init(void)
     // driver to install the way cc65 required joy_install().
 }
 
-unsigned char controller_joy_up(unsigned char port)
+/* Poll the joystick once per frame. Call this before reading direction
+   state. The individual direction functions read from the cached
+   joyx[]/joyy[]/joyb[] globals without re-polling hardware. */
+void controller_poll(unsigned char port)
 {
     joy_poll(port);
+}
+
+unsigned char controller_joy_up(unsigned char port)
+{
     return (joyy[port] == -1);
 }
 
 unsigned char controller_joy_down(unsigned char port)
 {
-    joy_poll(port);
     return (joyy[port] == 1);
 }
 
 unsigned char controller_joy_left(unsigned char port)
 {
-    joy_poll(port);
     return (joyx[port] == -1);
 }
 
 unsigned char controller_joy_right(unsigned char port)
 {
-    joy_poll(port);
     return (joyx[port] == 1);
 }
 
 unsigned char controller_joy_fire(unsigned char port)
 {
-    joy_poll(port);
     return (joyb[port]);
 }
 
@@ -49,7 +52,6 @@ unsigned char controller_joy_ispressed(unsigned char port, unsigned char button)
     if (button & 0x10) return (joyb[port]);
     return 0;
 }
-
 
 unsigned char controller_ispressed(unsigned char button)
 {

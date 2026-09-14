@@ -95,6 +95,12 @@ Public pixel access
 void renderlib_plot(unsigned char x, unsigned char y, unsigned char color)
 {
     if (hasBeenInitialized == 0) return;
+    /* Fast path: text mode is the common case */
+    if (currentMode == RMODE_TEXT)
+    {
+        plot_text(x, y, color);
+        return;
+    }
     switch (currentMode)
     {
         case RMODE_HIRES:
@@ -104,7 +110,6 @@ void renderlib_plot(unsigned char x, unsigned char y, unsigned char color)
             plot_mc(x, y, color);
             break;
         default:
-            plot_text(x, y, color);
             break;
     }
 }
@@ -112,6 +117,9 @@ void renderlib_plot(unsigned char x, unsigned char y, unsigned char color)
 unsigned char renderlib_getpixel(unsigned char x, unsigned char y)
 {
     if (hasBeenInitialized == 0) return 0;
+    /* Fast path: text mode is the common case */
+    if (currentMode == RMODE_TEXT)
+        return get_text(x, y);
     switch (currentMode)
     {
         case RMODE_HIRES:
@@ -119,7 +127,7 @@ unsigned char renderlib_getpixel(unsigned char x, unsigned char y)
         case RMODE_MC_BITMAP:
             return get_mc(x, y);
         default:
-            return get_text(x, y);
+            return 0;
     }
 }
 
@@ -485,6 +493,10 @@ void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, 
     unsigned char currentColor = renderlib_getpixel(x, y);
     if (currentColor == stopColor || currentColor == color) return;
 
+    /* Hoist screen dimensions out of the hot loop */
+    const unsigned char sw = (unsigned char)renderlib_screen_w();
+    const unsigned char sh = (unsigned char)renderlib_screen_h();
+
     ff_sp = 0;
     ff_stack[ff_sp++] = x;
     ff_stack[ff_sp++] = y;
@@ -496,8 +508,6 @@ void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, 
         unsigned char pc = renderlib_getpixel(px, py);
         if (pc == stopColor || pc == color) continue;
         renderlib_plot(px, py, color);
-        unsigned char sw = renderlib_screen_w();
-        unsigned char sh = renderlib_screen_h();
         if (px > 0)         { unsigned char c = renderlib_getpixel(px - 1, py); if (c != stopColor && c != color) { ff_stack[ff_sp++] = px - 1; ff_stack[ff_sp++] = py; } }
         if (px + 1 < sw)    { unsigned char c = renderlib_getpixel(px + 1, py); if (c != stopColor && c != color) { ff_stack[ff_sp++] = px + 1; ff_stack[ff_sp++] = py; } }
         if (py > 0)         { unsigned char c = renderlib_getpixel(px, py - 1); if (c != stopColor && c != color) { ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py - 1; } }
@@ -512,6 +522,10 @@ char renderlib_findcenter(unsigned char x, unsigned char y, unsigned char *outX,
     unsigned char minX = x, maxX = x, minY = y, maxY = y;
     unsigned char color = renderlib_getpixel(x, y);
     if (color == 0) return 0;
+
+    /* Hoist screen dimensions out of the hot loop */
+    const unsigned char sw = (unsigned char)renderlib_screen_w();
+    const unsigned char sh = (unsigned char)renderlib_screen_h();
 
     ff_sp = 0;
     ff_stack[ff_sp++] = x;
@@ -528,8 +542,6 @@ char renderlib_findcenter(unsigned char x, unsigned char y, unsigned char *outX,
         if (px > maxX) maxX = px;
         if (py < minY) minY = py;
         if (py > maxY) maxY = py;
-        unsigned char sw = renderlib_screen_w();
-        unsigned char sh = renderlib_screen_h();
         if (px > 0)    { if (renderlib_getpixel(px - 1, py) == color) { ff_stack[ff_sp++] = px - 1; ff_stack[ff_sp++] = py; } }
         if (px + 1 < sw) { if (renderlib_getpixel(px + 1, py) == color) { ff_stack[ff_sp++] = px + 1; ff_stack[ff_sp++] = py; } }
         if (py > 0)    { if (renderlib_getpixel(px, py - 1) == color) { ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py - 1; } }

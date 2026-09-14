@@ -185,6 +185,7 @@ void respawn(unsigned char port, unsigned char color)
 void handleInput(unsigned char port)
 {
     unsigned char prevX, prevY, prevLastDir;
+    controller_poll(port);
     if (port == 0)
     {
         prevX = p1_x;

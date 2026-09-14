@@ -45,7 +45,8 @@ struct SIDHeader
 
 unsigned int SIDLOAD = 0x4000;
 
-unsigned int SIDSIZE = 6144;
+/* Must match the #embed size in soundlib_asm.c (song.bin from offset 126) */
+unsigned int SIDSIZE = 1339;
 // unsigned char SIDBAK[6144];
 
 extern void SIDINIT();
