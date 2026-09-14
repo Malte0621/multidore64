@@ -698,15 +698,25 @@ void renderlib_sprite_all_enable(unsigned char enabled)
 ----------------------------------------------------------
 Character operations (text modes)
 ----------------------------------------------------------
-*/
 
+/* ASCII to C64 screen code conversion (standard C64, unshifted mode).
+   Space/!-? (0x20-0x3F): same as ASCII. @: 0x00. A-Z: same as ASCII.
+   a-z (0x61-0x7A): ascii - 96. */
+static unsigned char ascii2scr(unsigned char c)
+{
+    if (c >= 0x20 && c <= 0x3F) return c;
+    if (c == 0x40) return 0x00;
+    if (c >= 0x41 && c <= 0x5A) return c;
+    if (c >= 0x61 && c <= 0x7A) return c - 96;
+    return 0x20;
+}
 void renderlib_drawchar(unsigned char x, unsigned char y, unsigned char color, unsigned char c)
 {
     if (hasBeenInitialized == 0) return;
     if (x >= 40 || y >= 25) return;
     unsigned int idx = y * 40 + x;
     colram[idx] = color;
-    charram[idx] = c;
+    charram[idx] = ascii2scr(c);
 }
 
 unsigned char renderlib_getchar(unsigned char x, unsigned char y)
@@ -725,7 +735,7 @@ void renderlib_drawstring(unsigned char x, unsigned char y, unsigned char color,
     {
         if (idx >= 1000) break;
         colram[idx] = color;
-        charram[idx] = *str;
+        charram[idx] = ascii2scr((unsigned char)*str);
         idx++;
         str++;
     }

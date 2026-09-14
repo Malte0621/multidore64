@@ -2,7 +2,7 @@
 ## A decent game engine for the commodore 64
 ---
 
-Multidore64 is a game engine for the commodore 64. It is written in C and is designed to be easy to use. It include helpful features/tools. Its designed to be used with the [cc65](https://cc65.github.io/) compiler.
+Multidore64 is a game engine for the commodore 64. It is written in C and is designed to be easy to use. It include helpful features/tools. Its designed to be used with the [oscar64](https://github.com/drmortalwombat/oscar64) compiler.
 
 (c) 2023-2026 Malte0621
 
@@ -23,8 +23,7 @@ Multidore64 is a game engine for the commodore 64. It is written in C and is des
 * Download the source code
 * Install oscar64
 * Change the `main.c` file to suit your needs
-* Compile the source code with cc65
-* Link the compiled code with ld65
+* Compile the source code with oscar64
 * Run the resulting binary in your favorite commodore 64 emulator
 
 ### How to contribute
