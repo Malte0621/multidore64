@@ -5,7 +5,7 @@ demonstrate the library in action.
 ----------------------------------------------------------
 MultiDore 64 - A decent game engine for the commodore 64!
 ----------------------------------------------------------
-(c) 2023 by Malte0621
+(c) 2023-2026 by Malte0621
 */
 
 #include <stdio.h>

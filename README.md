@@ -11,12 +11,13 @@ Multidore64 is a game engine for the commodore 64. It is written in C and is des
 
 ### Features
 * 2D graphics
+* 3D graphics
 * controls (joystick, keyboard)
 * sound (SID)
+* networking
 
 ### Planned features
-* 3D graphics
-* networking
+* ...
 
 ### How to use
 * Download the source code
