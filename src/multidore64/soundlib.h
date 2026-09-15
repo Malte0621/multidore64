@@ -15,5 +15,6 @@ MultiDore 64 - A decent game engine for the commodore 64!
 void soundlib_init();
 void soundlib_play(char FILEDATA[]);
 void soundlib_stop();
+void soundlib_update(); /* step the player once per frame (main loop only, never IRQ) */
 
 #endif

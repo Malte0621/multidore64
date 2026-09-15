@@ -8,6 +8,7 @@ MultiDore 64 - A decent game engine for the commodore 64!
 */
 
 #include <c64/vic.h>
+#include <c64/cia.h>
 #include "renderlib.h"
 
 /* Character and color RAM (C64 text mode). Pointers let oscar64 emit
@@ -169,19 +170,19 @@ void renderlib_setmode(unsigned char mode)
     switch (mode)
     {
         case RMODE_TEXT:
-            vic_setmode(VICM_TEXT, (const char *)0x0400, (const char *)0x0000);
+            vic_setmode(VICM_TEXT, (const char *)0x0400, (const char *)0x1000);
             break;
         case RMODE_HIRES:
             vic_setmode(VICM_HIRES, (const char *)0x0400, (const char *)0x0000);
             break;
         case RMODE_MC_CHAR:
-            vic_setmode(VICM_TEXT_MC, (const char *)0x0400, (const char *)0x0000);
+            vic_setmode(VICM_TEXT_MC, (const char *)0x0400, (const char *)0x1000);
             break;
         case RMODE_MC_BITMAP:
             vic_setmode(VICM_HIRES_MC, (const char *)0x0400, (const char *)0x0000);
             break;
         case RMODE_ECM:
-            vic_setmode(VICM_TEXT_ECM, (const char *)0x0400, (const char *)0x0000);
+            vic_setmode(VICM_TEXT_ECM, (const char *)0x0400, (const char *)0x1000);
             break;
     }
 }
@@ -812,7 +813,14 @@ void renderlib_init(void)
     if (hasBeenInitialized == 1) return;
     hasBeenInitialized = 1;
     currentMode = RMODE_TEXT;
-    vic_setmode(VICM_TEXT, (const char *)0x0400, (const char *)0x0000);
+    /* Direct register writes with kernal-default text-mode values:
+       $D011=$1B (DEN|RSEL|YSCROLL 3), $D016=$08 (40 columns),
+       $D018=$15 (screen $0400, char ROM at $1000). Charset selector
+       0 would read RAM at $0000, not the character ROM. */
+    cia2.pra = (cia2.pra & 0xfc) | 0x03; /* VIC bank 0 */
+    vic.ctrl1 = 0x1B;
+    vic.ctrl2 = 0x08;
+    vic.memptr = 0x15;
     renderlib_clear(0);
     renderlib_setcolor(0, 0);
 }

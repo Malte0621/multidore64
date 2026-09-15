@@ -405,6 +405,7 @@ int main(void)
     soundlib_play(SIDFILE);
     while (1)
     {
+        soundlib_update();
         if (controller_ispressed(0x20) || controller_joy_fire(0) || controller_joy_fire(1))
         {
             break;

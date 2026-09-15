@@ -12,6 +12,7 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include <string.h>
 #include "soundlib.h"
 #include <c64/sid.h>
+#include <c64/vic.h>
 #include "utilslib.h"
 
 struct SIDHeader
@@ -50,8 +51,7 @@ unsigned int SIDSIZE = 1339;
 // unsigned char SIDBAK[6144];
 
 extern void SIDINIT();
-extern void SIDPLAY();
-extern void SIDSTOP();
+extern void SIDSTEP();
 
 void soundlib_init()
 {
@@ -59,16 +59,26 @@ void soundlib_init()
 }
 
 void soundlib_play(char FILEDATA[]){
-	// memcpy((void*)(SIDBAK),(void*)SIDLOAD,SIDSIZE);
 	memcpy((void *)(SIDLOAD),(void *)FILEDATA,SIDSIZE);
     SIDINIT();
-    SIDPLAY();
+}
+
+/* Step the SID player once per VIC frame. Non-blocking: returns immediately
+   when no new frame has started. Never call from an IRQ (the tune keeps work
+   data in the CPU stack page). */
+void soundlib_update()
+{
+	static char wasBottom = 0;
+	char bottom = (vic.ctrl1 & VIC_CTRL1_RST8) != 0;
+	char newFrame = bottom && !wasBottom;
+	wasBottom = bottom;
+	if (newFrame)
+		SIDSTEP();
 }
 
 void soundlib_stop()
 {
 	// Stop the SID
-	SIDSTOP();
 	sid.voices[0].ctrl  = SID_CTRL_RECT;
 	sid.voices[1].ctrl  = SID_CTRL_RECT;
 	sid.voices[2].ctrl  = SID_CTRL_RECT;
