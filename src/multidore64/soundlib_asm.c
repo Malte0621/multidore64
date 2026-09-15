@@ -11,14 +11,8 @@ MultiDore 64 - A decent game engine for the commodore 64!
 // sequencer keeps work data in CPU stack page $0100-$01FF, so it must not
 // run from a raster IRQ handler (IRQ frames corrupt its data and vice versa).
 
-// Embedded SID song data (PSID). The original used
-//   _SIDFILE: .INCBIN "song.bin",$7e
-// which imports song.bin from byte $7e (126) to the end of the file.
-// song.bin is 1465 bytes, so 1465 - 126 = 1339 bytes are embedded.
-__export char SIDFILE[] = {
-    #embed 1339 126 "../song.bin"
-};
-
+// The engine does not embed any tune. Games either embed their own song data
+// or load one from disk; see soundlib_play() / soundlib_play_file().
 
 // Step the SID: jump to the SID play routine at 0x4003 and return.
 __native void SIDSTEP(void)

@@ -76,8 +76,12 @@ static unsigned char get_mc(unsigned char x, unsigned char y)
 /* Plot a pixel in text mode (40x25) - sets the character cell color */
 static void plot_text(unsigned char x, unsigned char y, unsigned char color)
 {
+    unsigned int cell;
     if (x >= 40 || y >= 25) return;
-    colram[y * 40 + x] = color;
+    cell = y * 40 + x;
+    charram[cell] = ' ';   /* always a blank glyph: the cell reads as a solid
+                              colored square, never as a leftover character */
+    colram[cell] = color;
 }
 
 /* Get a pixel in text mode - returns the character cell color */

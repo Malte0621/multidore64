@@ -28,6 +28,7 @@ int main(void)
 | **netlib** | Serial link (CIA2) with a reliable ACK/NAK packet protocol |
 | **colorlib** | The 16-color VIC-II palette as named constants |
 | **utilslib** | Timing helpers |
+| **filelib** | Commodore 64 disk filesystem (read, write, append, delete) |
 
 ## Documentation
 
@@ -42,6 +43,7 @@ int main(void)
 | [Networking](netlib.html) | Two-player serial link |
 | [Colors](colorlib.html) | The 16-color palette |
 | [Utilities](utilslib.html) | Sleep and timing |
+| [Filesystem](filelib.html) | C64 disk file read/write/append |
 | [Memory map](memory.html) | How the engine lays out C64 memory |
 | [Examples](examples.html) | Complete, runnable programs |
 

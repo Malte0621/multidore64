@@ -62,7 +62,7 @@ The canonical game opening: prompt, music stepping in the loop, wait for fire, s
 #include "multidore64/controllerlib.h"
 #include "multidore64/colorlib.h"
 
-extern char SIDFILE[];
+
 
 int main(void)
 {
@@ -75,7 +75,7 @@ int main(void)
     renderlib_drawstring(11, 10, color_white, "MULTIDORE 64");
     renderlib_drawstring(9, 14, color_yellow, "PRESS FIRE TO START");
 
-    soundlib_play(SIDFILE);
+    soundlib_play_file("song.bin");   // load and play from disk (or use soundlib_play for RAM)
 
     while (!controller_joy_fire(0) && !controller_ispressed(0x20))
         soundlib_update();        // one music tick per frame, non-blocking

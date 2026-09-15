@@ -10,10 +10,10 @@
 
 ```c
 void soundlib_init(void);
-void soundlib_play(char FILEDATA[]);   // copy tune + initialize SID
-void soundlib_update(void);            // one play tick (call once per frame)
-void soundlib_stop(void);              // silence all voices
-```
+unsigned char soundlib_play(const char *tune, unsigned int len); // play buffer (raw or PSID)
+unsigned char soundlib_play_file(const char *filename);          // load from disk & play
+void soundlib_update(void);                                      // one play tick per frame
+void soundlib_stop(void);                                        // silence all voices
 
 ## Quick start
 
@@ -21,16 +21,13 @@ void soundlib_stop(void);              // silence all voices
 #include "multidore64/renderlib.h"
 #include "multidore64/soundlib.h"
 #include "multidore64/colorlib.h"
-
-extern char SIDFILE[];   // provided by the engine (src/song.bin)
-
 int main(void)
 {
     renderlib_init();
     soundlib_init();
-    renderlib_drawstring(12, 12, color_white, "NOW PLAYING...");
 
-    soundlib_play(SIDFILE);
+    // Load tune from disk and start playback (no embedding needed)
+    soundlib_play_file("song.bin");
 
     while (1)
     {
@@ -41,10 +38,10 @@ int main(void)
 ```
 
 ## How it works
-
-- `soundlib_play()` copies the PSID payload to `$4000` and calls the tune's init routine.
+- `soundlib_play_file(filename)` loads a tune directly from disk (device 8) into `$4000` and starts playback.
+- `soundlib_play(buf, len)` stages an in-memory tune at `$4000` and starts playback. Both raw 6502 code and unstripped PSID/RSID files are supported (headers are automatically detected and stripped).
 - `soundlib_update()` calls the tune's play routine once per 50 Hz frame, paced by the VIC raster. It **never blocks**: on frames it has already seen it returns immediately.
-- `soundlib_stop()` sets all three voices to release mode.
+- `soundlib_stop()` sets all three voices to release mode and stops updates.
 
 ## Rules and pitfalls
 
@@ -54,7 +51,7 @@ int main(void)
 - **Call it once per frame, every frame.** Calling it faster speeds the music up; skipping frames slows it down or makes it stutter.
 - One tune at a time: `$4000-$453B` is owned by the player while music plays (see [memory map](memory.html)).
 - Don't poke SID registers for sound effects while the tune plays - the player rewrites most registers every frame. Plan effects after `soundlib_stop()` or on voices the tune leaves alone.
-- The embedded tune lives in `src/song.bin` and is exposed as `extern char SIDFILE[]`. Replace the file to change the music; keep the PSID format (header + tune) intact.
+- The engine embeds no tune binaries. Load songs from disk via `soundlib_play_file()` or pass a memory buffer to `soundlib_play()`.
 
 ## Stopping music
 

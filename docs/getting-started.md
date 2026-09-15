@@ -58,7 +58,8 @@ multidore64/
 │       ├── controllerlib.c/.h
 │       ├── netlib.c/.h
 │       ├── colorlib.h
-│       └── utilslib.c/.h
+│       ├── utilslib.c/.h
+│       └── filelib.c/.h
 └── dist/                # build output (created by the build)
 ```
 

@@ -29,7 +29,7 @@ Exact boundaries for a given build come from the `.map` file oscar64 writes next
 `soundlib_play()` copies the PSID payload to `$4000` and jumps to the tune's init entry there. While music plays, `$4000-$453B` belongs to the player:
 
 ```c
-soundlib_play(SIDFILE);    // $4000-$453B in use
+soundlib_play_file("song.bin"); // or soundlib_play(buf, len); $4000-$453B in use
 ...
 soundlib_stop();           // area reusable again
 ```

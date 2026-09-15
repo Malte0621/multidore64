@@ -46,6 +46,7 @@ NAV = [
         ("netlib", "Networking"),
         ("colorlib", "Colors"),
         ("utilslib", "Utilities"),
+        ("filelib", "Filesystem"),
     ]),
     ("Reference", [
         ("memory", "Memory map"),

@@ -11,22 +11,28 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <conio.h>
 #include "multidore64/renderlib.h"
 #include "multidore64/soundlib.h"
 #include "multidore64/colorlib.h"
 #include "multidore64/controllerlib.h"
 #include "multidore64/utilslib.h"
 
-char max_x = 39, max_y = 24;
+#define GAME_TICK_FRAMES 4    /* snake speed: one move every 4 frames (~12.5 Hz) */
+#define GAME_TICKS        600 /* round length: 600 ticks * 4 frames = ~48 s */
 
-char p1_x = 0, p1_y = 0,
+signed char max_x = 39, max_y = 24;
+
+signed char p1_x = 0, p1_y = 0,
      p2_x = 0, p2_y = 0;
 
-char p1_lastDir = 0, p2_lastDir = 0;
-char p1_bo = 0, p2_bo = 0; // Black Over (How many times the player has gone over a black pixel)
-char p1_nd = 0, p2_nd = 0; // Near Death (When the player is near death and has a last chance to survive)
+signed char p1_lastDir = 0, p2_lastDir = 0;
+signed char p1_bo = 0, p2_bo = 0; // Black Over (How many times the player has gone over a black pixel)
+signed char p1_nd = 0, p2_nd = 0; // Near Death (When the player is near death and has a last chance to survive)
 
-char nearDeathSaveTicks = 2; // how many ticks the player has to survive after being near death
+signed char nearDeathSaveTicks = 2; // how many ticks the player has to survive after being near death
+
+char currentKey = 0;            // keyboard key captured once per frame
 
 // Make a table where old colors are stored
 
@@ -37,10 +43,11 @@ unsigned char player1_character_color = 0x0A;
 unsigned char player2_color = 0x06;
 unsigned char player2_character_color = 0x0E;
 
-extern char SIDFILE[];
 
 void draw(unsigned char x, unsigned char y, unsigned char color)
 {
+    if (x >= 40 || y >= 25)
+        return;                 // never write outside map/screen
     if (color != player1_character_color && color != player2_character_color)
         map[x][y] = color;
     renderlib_plot(x, y, color);
@@ -53,7 +60,26 @@ unsigned char isInColor(unsigned char x, unsigned char y, unsigned char color)
 
 unsigned char isCollidingWith(unsigned char x, unsigned char y, unsigned char color)
 {
+    if (x >= 40 || y >= 25)
+        return 0;
     return renderlib_getpixel(x, y) == color;
+}
+
+/* Draw the 3x3 spawn square of a player (0 = p1, 1 = p2). */
+void drawPlayerSquare(unsigned char port)
+{
+    signed char px = port ? p2_x : p1_x;
+    signed char py = port ? p2_y : p1_y;
+    unsigned char color = port ? player2_color : player1_color;
+    draw(px, py, color);
+    draw(px + 1, py, color);
+    draw(px - 1, py, color);
+    draw(px, py + 1, color);
+    draw(px, py - 1, color);
+    draw(px + 1, py + 1, color);
+    draw(px - 1, py - 1, color);
+    draw(px + 1, py - 1, color);
+    draw(px - 1, py + 1, color);
 }
 
 void resetGame()
@@ -67,13 +93,18 @@ void resetGame()
             map[x][y] = 0;
         }
     }
-    p1_x = 0;
-    p1_y = 0;
-    p2_x = 0;
-    p2_y = 0;
+    p1_x = 5;
+    p1_y = 12;
+    p2_x = 34;
+    p2_y = 12;
     p1_lastDir = 0;
     p2_lastDir = 0;
-    renderlib_clear(0);
+    p1_bo = 0;
+    p2_bo = 0;
+    p1_nd = 0;
+    p2_nd = 0;
+    drawPlayerSquare(0);
+    drawPlayerSquare(1);
 }
 
 void replaceColor(unsigned char color, unsigned char color2)
@@ -139,16 +170,7 @@ void respawn(unsigned char port, unsigned char color)
             p1_x = rand() % 37;
             p1_y = rand() % 22;
         }
-        // Draw A 3X3 square around the player
-        draw(p1_x, p1_y, player1_color);
-        draw(p1_x + 1, p1_y, player1_color);
-        draw(p1_x - 1, p1_y, player1_color);
-        draw(p1_x, p1_y + 1, player1_color);
-        draw(p1_x, p1_y - 1, player1_color);
-        draw(p1_x + 1, p1_y + 1, player1_color);
-        draw(p1_x - 1, p1_y - 1, player1_color);
-        draw(p1_x + 1, p1_y - 1, player1_color);
-        draw(p1_x - 1, p1_y + 1, player1_color);
+        drawPlayerSquare(0);
         p1_lastDir = 1;
         p1_bo = 0;
         p1_nd = 0;
@@ -166,16 +188,7 @@ void respawn(unsigned char port, unsigned char color)
             p2_x = rand() % 37;
             p2_y = rand() % 22;
         }
-        // Draw A 3X3 square around the player
-        draw(p2_x, p2_y, player2_color);
-        draw(p2_x + 1, p2_y, player2_color);
-        draw(p2_x - 1, p2_y, player2_color);
-        draw(p2_x, p2_y + 1, player2_color);
-        draw(p2_x, p2_y - 1, player2_color);
-        draw(p2_x + 1, p2_y + 1, player2_color);
-        draw(p2_x - 1, p2_y - 1, player2_color);
-        draw(p2_x + 1, p2_y - 1, player2_color);
-        draw(p2_x - 1, p2_y + 1, player2_color);
+        drawPlayerSquare(1);
         p2_lastDir = 1;
         p2_bo = 0;
         p2_nd = 0;
@@ -184,41 +197,81 @@ void respawn(unsigned char port, unsigned char color)
 
 void handleInput(unsigned char port)
 {
-    unsigned char prevX, prevY, prevLastDir;
+    signed char prevX, prevY;
+    signed char prevLastDir;
     controller_poll(port);
     if (port == 0)
     {
         prevX = p1_x;
         prevY = p1_y;
         prevLastDir = p1_lastDir;
-        if (controller_joy_up(port) || controller_ispressed(0x17) || p1_lastDir == 2)
+        if (p1_lastDir == 0)
+        {
+            // standing still: only a fresh input starts movement
+            if (controller_joy_up(port) || currentKey == 0x57 || currentKey == 0x77)          // W
+            {
+                p1_y--;
+                p1_lastDir = 2;
+            }
+            else if (controller_joy_down(port) || currentKey == 0x53 || currentKey == 0x73)   // S
+            {
+                p1_y++;
+                p1_lastDir = 3;
+            }
+            else if (controller_joy_left(port) || currentKey == 0x41 || currentKey == 0x61)   // A
+            {
+                p1_x--;
+                p1_lastDir = 4;
+            }
+            else if (controller_joy_right(port) || currentKey == 0x44 || currentKey == 0x64)  // D
+            {
+                p1_x++;
+                p1_lastDir = 5;
+            }
+            if (prevLastDir == 0 && p1_lastDir != 0)
+            {
+                respawn(0, 0);
+                return;
+            }
+            return;
+        }
+        if (p1_lastDir == 1)
+        {
+            return;
+        }
+        // moving: keep gliding in the current direction
+        if (p1_lastDir == 2)
         {
             p1_y--;
-            p1_lastDir = 2;
         }
-        if (controller_joy_down(port) || controller_ispressed(0x13) || p1_lastDir == 3)
+        else if (p1_lastDir == 3)
         {
             p1_y++;
-            p1_lastDir = 3;
         }
-        if (controller_joy_left(port) || controller_ispressed(0x01) || p1_lastDir == 4)
+        else if (p1_lastDir == 4)
         {
             p1_x--;
-            p1_lastDir = 4;
         }
-        if (controller_joy_right(port) || controller_ispressed(0x04) || p1_lastDir == 5)
+        else if (p1_lastDir == 5)
         {
             p1_x++;
-            p1_lastDir = 5;
         }
-        if (prevLastDir == 0 && p1_lastDir != 0)
+        // steering while gliding
+        if (controller_joy_up(port) || currentKey == 0x57 || currentKey == 0x77)
         {
-            respawn(0, 0);
-            return;
+            if (p1_lastDir != 3) { p1_y--; p1_lastDir = 2; }
         }
-        if (p1_lastDir == 0 || p1_lastDir == 1)
+        else if (controller_joy_down(port) || currentKey == 0x53 || currentKey == 0x73)
         {
-            return;
+            if (p1_lastDir != 2) { p1_y++; p1_lastDir = 3; }
+        }
+        else if (controller_joy_left(port) || currentKey == 0x41 || currentKey == 0x61)
+        {
+            if (p1_lastDir != 5) { p1_x--; p1_lastDir = 4; }
+        }
+        else if (controller_joy_right(port) || currentKey == 0x44 || currentKey == 0x64)
+        {
+            if (p1_lastDir != 4) { p1_x++; p1_lastDir = 5; }
         }
         if (isCollidingWith(p1_x, p1_y, player2_character_color))
         {
@@ -275,12 +328,7 @@ void handleInput(unsigned char port)
             p1_y = max_y;
             p1_lastDir = 1;
         }
-        if (p2_lastDir == 0)
-        {
-            p2_x = p1_x;
-            p2_y = p1_y;
-        }
-        if (controller_joy_fire(port) || controller_ispressed(0x20))
+        if (controller_joy_fire(0) || currentKey == 0x20)
         {
             p1_lastDir = 1;
         }
@@ -291,34 +339,70 @@ void handleInput(unsigned char port)
         prevX = p2_x;
         prevY = p2_y;
         prevLastDir = p2_lastDir;
-        if (controller_joy_up(port) || p2_lastDir == 3)
+        if (p2_lastDir == 0)
+        {
+            if (controller_joy_up(port))
+            {
+                p2_y--;
+                p2_lastDir = 2;
+            }
+            else if (controller_joy_down(port))
+            {
+                p2_y++;
+                p2_lastDir = 3;
+            }
+            else if (controller_joy_left(port))
+            {
+                p2_x--;
+                p2_lastDir = 4;
+            }
+            else if (controller_joy_right(port))
+            {
+                p2_x++;
+                p2_lastDir = 5;
+            }
+            if (prevLastDir == 0 && p2_lastDir != 0)
+            {
+                respawn(1, 0);
+                return;
+            }
+            return;
+        }
+        if (p2_lastDir == 1)
+        {
+            return;
+        }
+        if (p2_lastDir == 2)
         {
             p2_y--;
-            p2_lastDir = 3;
         }
-        if (controller_joy_down(port) || p2_lastDir == 4)
+        else if (p2_lastDir == 3)
         {
             p2_y++;
-            p2_lastDir = 4;
         }
-        if (controller_joy_left(port) || p2_lastDir == 5)
+        else if (p2_lastDir == 4)
         {
             p2_x--;
-            p2_lastDir = 5;
         }
-        if (controller_joy_right(port) || p2_lastDir == 6)
+        else if (p2_lastDir == 5)
         {
             p2_x++;
-            p2_lastDir = 6;
         }
-        if (prevLastDir == 0 && p2_lastDir != 0)
+        if (controller_joy_up(port))
         {
-            respawn(1, 0);
-            return;
+            if (p2_lastDir != 3) { p2_y--; p2_lastDir = 2; }
         }
-        if (p2_lastDir == 0 || p2_lastDir == 1)
+        else if (controller_joy_down(port))
         {
-            return;
+            if (p2_lastDir != 2) { p2_y++; p2_lastDir = 3; }
+        }
+        else if (controller_joy_left(port))
+        {
+            if (p2_lastDir != 5) { p2_x--; p2_lastDir = 4; }
+        }
+        else if (controller_joy_right(port))
+        {
+            if (p2_lastDir != 4) { p2_x++; p2_lastDir = 5; }
         }
         if (isCollidingWith(p2_x, p2_y, player1_character_color))
         {
@@ -337,7 +421,6 @@ void handleInput(unsigned char port)
             }
             else
             {
-                p2_nd++;
             }
             return;
         }
@@ -375,11 +458,6 @@ void handleInput(unsigned char port)
             p2_y = max_y;
             p2_lastDir = 1;
         }
-        if (p1_lastDir == 0)
-        {
-            p1_x = p2_x;
-            p1_y = p2_y;
-        }
         if (controller_joy_fire(port))
         {
             p2_lastDir = 1;
@@ -390,7 +468,7 @@ void handleInput(unsigned char port)
 
 int main(void)
 {
-    int timeLeft = 240;
+    int timeLeft = GAME_TICKS;
     int p1Score = 0;
     int p2Score = 0;
     int i;
@@ -401,8 +479,8 @@ int main(void)
     controller_init();
 
     sleep(50);
-    renderlib_drawstring(max_x / 2 - 16, max_y / 2, color_white, "press space/fire button to start");
-    soundlib_play(SIDFILE);
+    renderlib_drawstring(3, max_y / 2, color_white, "press space/fire button to start");
+    soundlib_play_file("song.bin");
     while (1)
     {
         soundlib_update();
@@ -419,9 +497,12 @@ int main(void)
     // Game Loop
     while (1)
     {
+        // capture the keyboard once per frame; getch() consumes the buffer,
+        // so reading it repeatedly (per player, per direction) would lose keys
+        currentKey = kbhit() ? getch() : 0;
 
         // check if the letter "Q" was pressed
-        if (controller_ispressed(0x51)) // TODO: Correct this.
+        if (currentKey == 0x51 || currentKey == 0x71)
         {
             // if so, exit the program
             break;
@@ -431,7 +512,7 @@ int main(void)
         handleInput(0);
         handleInput(1);
 
-        sleep(750);
+        sleep(GAME_TICK_FRAMES);
 
         if (timeLeft > 0)
         {
@@ -440,10 +521,10 @@ int main(void)
         else
         {
             // Game over
-            // Check who won
-            for (i = 0; i < 320; i++)
+            // Check who won (the playfield is the 40x25 text grid)
+            for (i = 0; i < 40; i++)
             {
-                for (j = 0; j < 200; j++)
+                for (j = 0; j < 25; j++)
                 {
                     if (renderlib_getpixel(i, j) == player1_color)
                     {
@@ -455,11 +536,10 @@ int main(void)
                     }
                 }
             }
-    renderlib_clear(0);
+            renderlib_clear(0);
             if (p1Score > p2Score)
             {
                 // Player 1 wins
-                // Draw in the center of the screen (use max_x and max_y)
                 renderlib_drawstring(max_x / 2 - 7, max_y / 2, color_white, "Player 1 wins!");
             }
             else if (p2Score > p1Score)
@@ -472,9 +552,11 @@ int main(void)
                 // Draw
                 renderlib_drawstring(max_x / 2 - 2, max_y / 2, color_white, "Draw!");
             }
-            sleep(1000);
+            sleep(200);
             resetGame();
-            // break;
+            timeLeft = GAME_TICKS;
+            p1Score = 0;
+            p2Score = 0;
         }
     }
     renderlib_unload();
