@@ -34,8 +34,8 @@ struct SIDHeader
 
 #define BE(x) (((unsigned short)(x) >> 8) | ((unsigned short)(x) << 8))
 
-#define SID_STAGE   0x4000      /* staging address where the player runs */
-#define SID_MAXLEN  6144        /* stay well below screen and heap */
+#define SID_STAGE   0x4000  /* tune must run at exactly $4000: vectors are baked in */
+#define SID_MAXLEN  2048    /* $4000-$47FF; do not malloc while a tune plays */
 
 extern void SIDINIT();
 extern void SIDSTEP();
@@ -58,14 +58,32 @@ unsigned char soundlib_play(const char *tune, unsigned int len)
     {
         const struct SIDHeader *hdr = (const struct SIDHeader *)tune;
         unsigned int offset = BE(hdr->dataOffset);
+        unsigned short loadAddr;
         if (hdr->loadAddress == 0)
-            offset += 2;        // skip 2-byte C64 load address in data block
-        if (offset < len)
         {
-            tune += offset;
-            len -= offset;
+            // load address is the first 2 bytes of the data block
+            if ((unsigned int)offset + 1 >= len)
+                return 0;   // truncated: load address word missing
+            loadAddr = (unsigned char)tune[offset] << 8;
+            loadAddr |= (unsigned char)tune[offset + 1];
+            offset += 2;
         }
+        else
+        {
+            loadAddr = BE(hdr->loadAddress);
+        }
+        // SIDINIT/SIDSTEP jump to fixed $4000/$4003: a tune that loads
+        // anywhere else would execute garbage. Reject it instead.
+        if (loadAddr != SID_STAGE)
+            return 0;
+        if (offset >= len)
+            return 0;       // truncated: no data block
+        tune += offset;
+        len -= offset;
     }
+
+    if (len < 4)
+        return 0;           // too short to contain init+play code
 
     if (len > SID_MAXLEN)
         len = SID_MAXLEN;
@@ -97,12 +115,26 @@ unsigned char soundlib_play_file(const char *filename)
     }
     cbm_name[j] = 0;
 
-    krnio_setnam(cbm_name);
-    if (!krnio_open(2, 8, 2))
-        return 0;
-
-    int bytes = krnio_read(2, (char *)SID_STAGE, SID_MAXLEN);
-    krnio_close(2);
+    /* Right after autostart the drive can still be finishing the LOAD;
+       opening in that window fails or reads zero bytes. Retry a few times
+       with a short settle delay instead of giving up silently. A device
+       error (ST != 0) also discards the read: truncated data would make
+       SIDINIT jump into garbage and crash the machine. */
+    int bytes = 0;
+    for (int attempt = 0; attempt < 2 && bytes <= 0; attempt++)
+    {
+        krnio_setnam(cbm_name);
+        if (krnio_open(2, 8, 2))
+        {
+            bytes = krnio_read(2, (char *)SID_STAGE, SID_MAXLEN);
+            krnio_close(2);
+            if (bytes > 0 && krnio_status() != 0)
+                bytes = 0;  // read error mid-file: data is truncated
+        }
+        if (bytes <= 0)
+            for (int f = 0; f < 25; f++)
+                vic_waitFrame();   /* ~0.5 s for the drive to settle */
+    }
 
     if (bytes <= 0)
         return 0;

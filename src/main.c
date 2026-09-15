@@ -8,6 +8,26 @@ MultiDore 64 - A decent game engine for the commodore 64!
 (c) 2023-2026 by Malte0621
 */
 
+/*
+Territory capture game in the style of Splix.io / Paper.io:
+
+- Two players glide continuously across a 40x24 grid (row 0 is HUD).
+- Leaving your own territory draws a trail behind you.
+- Returning to your territory closes the loop: everything the trail
+  encloses (empty cells AND enemy territory) becomes yours.
+- Crossing your own trail or the arena wall kills you.
+- Crossing the ENEMY's trail cuts it: the enemy dies.
+- Enclosing the enemy's head inside a capture kills them too.
+- Dying wipes all your cells; you respawn with a fresh 3x3 base.
+- Round ends after ROUND_TICKS (~48 s) or when a player owns WIN_PCT.
+  Most territory wins.
+
+Controls:
+- Player 1: W/A/S/D or joystick port 1.
+- Player 2: cursor keys or joystick port 2.
+- Q quits, space/fire starts a round from the title/game-over screen.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,547 +38,516 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #include "multidore64/controllerlib.h"
 #include "multidore64/utilslib.h"
 
-#define GAME_TICK_FRAMES 4    /* snake speed: one move every 4 frames (~12.5 Hz) */
-#define GAME_TICKS        600 /* round length: 600 ticks * 4 frames = ~48 s */
+#define TICK_FRAMES   4     /* one game tick every 4 frames (~12.5 Hz) */
+#define ROUND_TICKS   600   /* 600 ticks * 4 frames = ~48 s round */
+#define WIN_PCT       65    /* instant win when a player owns >= 65 % */
+#define RESPAWN_TICKS 10    /* death-to-respawn delay in ticks */
+#define ARENA_TOP     1     /* row 0 is the HUD line */
+#define ARENA_BOT     24
+#define ARENA_W       40
+#define ARENA_CELLS   960   /* 40 * 24 */
 
-signed char max_x = 39, max_y = 24;
+/* Cell values stored in map[][] (ownership, NOT colors) */
+#define CELL_EMPTY    0
+#define CELL_P1_LAND  1
+#define CELL_P1_TRAIL 2
+#define CELL_P2_LAND  3
+#define CELL_P2_TRAIL 4
 
-signed char p1_x = 0, p1_y = 0,
-     p2_x = 0, p2_y = 0;
+/* Direction codes: 0 = stopped, 1 = up, 2 = down, 3 = left, 4 = right */
+static const signed char dirX[5] = { 0,  0,  0, -1,  1 };
+static const signed char dirY[5] = { 0, -1,  1,  0,  0 };
+static const unsigned char opposite[5] = { 0, 2, 1, 4, 3 };
 
-signed char p1_lastDir = 0, p2_lastDir = 0;
-signed char p1_bo = 0, p2_bo = 0; // Black Over (How many times the player has gone over a black pixel)
-signed char p1_nd = 0, p2_nd = 0; // Near Death (When the player is near death and has a last chance to survive)
+/* Colors per map value: empty, p1 land, p1 trail, p2 land, p2 trail */
+static const unsigned char cellColor[5] = { 0x00, 0x02, 0x0A, 0x06, 0x0E };
+#define HEAD_COLOR_P1 0x01   /* white */
+#define HEAD_COLOR_P2 0x07   /* yellow */
 
-signed char nearDeathSaveTicks = 2; // how many ticks the player has to survive after being near death
+/* Player state, index 0 = player 1, 1 = player 2 */
+static signed char px[2], py[2];
+static unsigned char pdir[2];       /* 0 stopped, 1..4 direction */
+static unsigned char palive[2];
+static unsigned char ptrail[2];     /* 1 while a trail is drawn */
+static unsigned char prespawn[2];   /* countdown ticks until respawn */
+static unsigned char pkills[2];
 
-char currentKey = 0;            // keyboard key captured once per frame
+/* Direction requested by a keypress this tick (0 = none). */
+static unsigned char p1key, p2key;
 
-// Make a table where old colors are stored
+int timeLeft = ROUND_TICKS;         /* global so tests can poke it */
 
-unsigned char map[40][25];
+/* Playfield ownership mirror + capture scratch, at fixed addresses:
+   the compiled program stays below $4000 (SID tune staging area) and
+   $C000-$CFFF is free RAM below the I/O area. */
+typedef unsigned char MapRow[25];
+static MapRow * const map = (MapRow *)0xC7D0;          /* 40x25 = 1000 bytes */
+static MapRow * const visited = (MapRow *)0xCBB8;      /* BFS marker */
+static unsigned char * const queue = (unsigned char *)0xC000; /* BFS queue, 2 bytes/cell */
 
-unsigned char player1_color = 0x02;
-unsigned char player1_character_color = 0x0A;
-unsigned char player2_color = 0x06;
-unsigned char player2_character_color = 0x0E;
+#define landOf(p)   ((p) ? CELL_P2_LAND  : CELL_P1_LAND)
+#define trailOf(p)  ((p) ? CELL_P2_TRAIL : CELL_P1_TRAIL)
+#define headColor(p) ((p) ? HEAD_COLOR_P2 : HEAD_COLOR_P1)
 
-
-void draw(unsigned char x, unsigned char y, unsigned char color)
+/* Redraw one cell from the ownership map (single source of truth). */
+static void renderCell(unsigned char x, unsigned char y)
 {
-    if (x >= 40 || y >= 25)
-        return;                 // never write outside map/screen
-    if (color != player1_character_color && color != player2_character_color)
-        map[x][y] = color;
-    renderlib_plot(x, y, color);
+    renderlib_plot(x, y, cellColor[map[x][y]]);
 }
 
-unsigned char isInColor(unsigned char x, unsigned char y, unsigned char color)
+static void drawHead(unsigned char p)
 {
-    return (map[x][y] == color);
+    renderlib_plot(px[p], py[p], headColor(p));
 }
 
-unsigned char isCollidingWith(unsigned char x, unsigned char y, unsigned char color)
+/* ------------------------------------------------------------------ */
+/* Scoring                                                            */
+/* ------------------------------------------------------------------ */
+
+static unsigned int landCount(unsigned char p)
 {
-    if (x >= 40 || y >= 25)
-        return 0;
-    return renderlib_getpixel(x, y) == color;
+    unsigned char x, y;
+    unsigned int n = 0;
+    unsigned char land = landOf(p);
+    for (x = 0; x < ARENA_W; x++)
+        for (y = ARENA_TOP; y <= ARENA_BOT; y++)
+            if (map[x][y] == land)
+                n++;
+    return n;
 }
 
-/* Draw the 3x3 spawn square of a player (0 = p1, 1 = p2). */
-void drawPlayerSquare(unsigned char port)
+static unsigned char landPct(unsigned char p)
 {
-    signed char px = port ? p2_x : p1_x;
-    signed char py = port ? p2_y : p1_y;
-    unsigned char color = port ? player2_color : player1_color;
-    draw(px, py, color);
-    draw(px + 1, py, color);
-    draw(px - 1, py, color);
-    draw(px, py + 1, color);
-    draw(px, py - 1, color);
-    draw(px + 1, py + 1, color);
-    draw(px - 1, py - 1, color);
-    draw(px + 1, py - 1, color);
-    draw(px - 1, py + 1, color);
+    return (unsigned char)(landCount(p) * 100 / ARENA_CELLS);
 }
 
-void resetGame()
+/* ------------------------------------------------------------------ */
+/* Spawning / dying                                                   */
+/* ------------------------------------------------------------------ */
+
+/* Give a player a fresh 3x3 base around (cx, cy). */
+static void placeBase(unsigned char p, unsigned char cx, unsigned char cy)
 {
-    unsigned char x;
-    unsigned char y;
-    for (x = 0; x < 40; x++)
-    {
-        for (y = 0; y < 25; y++)
+    signed char x, y;
+    px[p] = cx;
+    py[p] = cy;
+    pdir[p] = 0;
+    ptrail[p] = 0;
+    palive[p] = 1;
+    for (x = cx - 1; x <= cx + 1; x++)
+        for (y = cy - 1; y <= cy + 1; y++)
         {
-            map[x][y] = 0;
+            map[x][y] = landOf(p);
+            renderCell(x, y);
+        }
+    drawHead(p);
+}
+
+/* Respawn at a random spot whose 3x3 surroundings are completely empty. */
+static void spawn(unsigned char p)
+{
+    unsigned char x, y, i;
+    for (i = 0; i < 64; i++)
+    {
+        x = 2 + (unsigned char)(rand() % 36);
+        y = ARENA_TOP + 1 + (unsigned char)(rand() % 21);
+        if (map[x - 1][y - 1] == CELL_EMPTY && map[x][y - 1] == CELL_EMPTY &&
+            map[x + 1][y - 1] == CELL_EMPTY && map[x - 1][y] == CELL_EMPTY &&
+            map[x][y] == CELL_EMPTY && map[x + 1][y] == CELL_EMPTY &&
+            map[x - 1][y + 1] == CELL_EMPTY && map[x][y + 1] == CELL_EMPTY &&
+            map[x + 1][y + 1] == CELL_EMPTY)
+        {
+            placeBase(p, x, y);
+            return;
         }
     }
-    p1_x = 5;
-    p1_y = 12;
-    p2_x = 34;
-    p2_y = 12;
-    p1_lastDir = 0;
-    p2_lastDir = 0;
-    p1_bo = 0;
-    p2_bo = 0;
-    p1_nd = 0;
-    p2_nd = 0;
-    drawPlayerSquare(0);
-    drawPlayerSquare(1);
+    placeBase(p, p ? 34 : 5, 12);   /* fallback if the arena is crowded */
 }
 
-void replaceColor(unsigned char color, unsigned char color2)
+/* credit: 0/1 = that player scores a kill, 2 = nobody (wall/self/head-on). */
+static void die(unsigned char p, unsigned char credit)
 {
-    unsigned char x;
-    unsigned char y;
-    for (x = 0; x < 40; x++)
-    {
-        for (y = 0; y < 25; y++)
-        {
-            if (renderlib_getpixel(x, y) == color)
+    unsigned char x, y;
+    unsigned char land = landOf(p);
+    unsigned char trail = trailOf(p);
+    for (x = 0; x < ARENA_W; x++)
+        for (y = ARENA_TOP; y <= ARENA_BOT; y++)
+            if (map[x][y] == land || map[x][y] == trail)
             {
-                draw(x, y, color2);
+                map[x][y] = CELL_EMPTY;
+                renderCell(x, y);
             }
-        }
-    }
+    if (credit < 2)
+        pkills[credit]++;
+    palive[p] = 0;
+    ptrail[p] = 0;
+    pdir[p] = 0;
+    prespawn[p] = RESPAWN_TICKS;
 }
 
-void restoreFromMap(unsigned char color)
+/* ------------------------------------------------------------------ */
+/* Capture (loop closure)                                             */
+/* ------------------------------------------------------------------ */
+
+/* The player just re-entered their own land with a trail drawn.
+   1. The trail itself becomes territory.
+   2. Flood fill from the arena border through cells that are NOT the
+      player's land; everything the fill cannot reach is enclosed.
+   3. All enclosed cells (empty, enemy land, enemy trail) become the
+      player's land. An enemy head caught inside dies. */
+static void capture(unsigned char p)
 {
-    unsigned char x;
-    unsigned char y;
-    unsigned char ocolor;
-    unsigned char temp;
-    for (x = 0; x < 40; x++)
-    {
-        for (y = 0; y < 25; y++)
-        {
-            ocolor = map[x][y];
-            temp = renderlib_getpixel(x, y);
-            if (temp == color)
+    unsigned char x, y, cx, cy, myland = landOf(p), mytrail = trailOf(p);
+    unsigned char other = 1 - p;
+    unsigned int qh = 0, qt = 0;
+
+    /* 1. trail becomes land */
+    for (x = 0; x < ARENA_W; x++)
+        for (y = ARENA_TOP; y <= ARENA_BOT; y++)
+            if (map[x][y] == mytrail)
             {
-                draw(x, y, ocolor);
+                map[x][y] = myland;
+                renderCell(x, y);
             }
-        }
+
+    /* 2. BFS from the border through non-my-land cells */
+    memset((void *)visited, 0, 1000);
+    for (x = 0; x < ARENA_W; x++)
+    {
+        if (map[x][ARENA_TOP] != myland && !visited[x][ARENA_TOP])
+        { visited[x][ARENA_TOP] = 1; queue[qt++] = x; queue[qt++] = ARENA_TOP; }
+        if (map[x][ARENA_BOT] != myland && !visited[x][ARENA_BOT])
+        { visited[x][ARENA_BOT] = 1; queue[qt++] = x; queue[qt++] = ARENA_BOT; }
     }
+    for (y = ARENA_TOP; y <= ARENA_BOT; y++)
+    {
+        if (map[0][y] != myland && !visited[0][y])
+        { visited[0][y] = 1; queue[qt++] = 0; queue[qt++] = y; }
+        if (map[ARENA_W - 1][y] != myland && !visited[ARENA_W - 1][y])
+        { visited[ARENA_W - 1][y] = 1; queue[qt++] = ARENA_W - 1; queue[qt++] = y; }
+    }
+    while (qh < qt)
+    {
+        cx = queue[qh++];
+        cy = queue[qh++];
+        if (cx > 0 && !visited[cx - 1][cy] && map[cx - 1][cy] != myland)
+        { visited[cx - 1][cy] = 1; queue[qt++] = cx - 1; queue[qt++] = cy; }
+        if (cx < ARENA_W - 1 && !visited[cx + 1][cy] && map[cx + 1][cy] != myland)
+        { visited[cx + 1][cy] = 1; queue[qt++] = cx + 1; queue[qt++] = cy; }
+        if (cy > ARENA_TOP && !visited[cx][cy - 1] && map[cx][cy - 1] != myland)
+        { visited[cx][cy - 1] = 1; queue[qt++] = cx; queue[qt++] = cy - 1; }
+        if (cy < ARENA_BOT && !visited[cx][cy + 1] && map[cx][cy + 1] != myland)
+        { visited[cx][cy + 1] = 1; queue[qt++] = cx; queue[qt++] = cy + 1; }
+    }
+
+    /* 3. enclosed cells become mine */
+    for (x = 0; x < ARENA_W; x++)
+        for (y = ARENA_TOP; y <= ARENA_BOT; y++)
+            if (!visited[x][y] && map[x][y] != myland)
+            {
+                if (palive[other] && px[other] == (signed char)x &&
+                    py[other] == (signed char)y)
+                    die(other, p);
+                map[x][y] = myland;
+                renderCell(x, y);
+            }
+    ptrail[p] = 0;
 }
 
-void findAndFloodFill(unsigned char x, unsigned char y, unsigned char color, unsigned char stopColor)
+/* ------------------------------------------------------------------ */
+/* One game tick for one player                                       */
+/* ------------------------------------------------------------------ */
+
+static void handlePlayer(unsigned char p)
 {
-    unsigned char cx;
-    unsigned char cy;
-    // Get the center of the shape
-    if (renderlib_findcenter(x, y, &cx, &cy))
+    signed char nx, ny, om, k;
+    unsigned char other = 1 - p;
+
+    if (!palive[p])
     {
-        // Flood fill the shape
-        renderlib_floodfill(cx, cy, color, stopColor);
+        if (--prespawn[p] == 0)
+            spawn(p);
+        return;
     }
-    replaceColor(stopColor, color);
+
+    /* steering: keys captured this tick + live joystick state */
+    controller_poll(p);
+    k = p ? p2key : p1key;
+    if (k == 0)
+    {
+        if (controller_joy_up(p)) k = 1;
+        else if (controller_joy_down(p)) k = 2;
+        else if (controller_joy_left(p)) k = 3;
+        else if (controller_joy_right(p)) k = 4;
+    }
+    if (k)
+    {
+        if (pdir[p] == 0 || k != opposite[pdir[p]])
+            pdir[p] = k;
+    }
+    if (pdir[p] == 0)
+        return;                     /* waiting for the first steering input */
+
+    /* one step in the current direction */
+    nx = px[p] + dirX[pdir[p]];
+    ny = py[p] + dirY[pdir[p]];
+
+    if (nx < 0 || nx >= ARENA_W || ny < ARENA_TOP || ny > ARENA_BOT)
+    {
+        die(p, 2);                  /* wall */
+        return;
+    }
+
+    om = map[nx][ny];
+    if (om == trailOf(p))
+    {
+        die(p, 2);                  /* crossed own trail */
+        return;
+    }
+    if (palive[other] && nx == px[other] && ny == py[other])
+    {
+        die(other, 2);              /* head-on: both die, no credit */
+        die(p, 2);
+        return;
+    }
+    if (om == trailOf(other))
+        die(other, p);              /* cut the enemy's trail */
+
+    /* leaving the current cell draws the trail (only outside own land) */
+    if (map[px[p]][py[p]] != landOf(p))
+    {
+        map[px[p]][py[p]] = trailOf(p);
+        ptrail[p] = 1;
+    }
+    renderCell(px[p], py[p]);       /* undraw the head overlay */
+
+    px[p] = nx;
+    py[p] = ny;
+    if (map[nx][ny] == landOf(p) && ptrail[p])
+        capture(p);                 /* loop closed */
+    drawHead(p);
 }
 
-void respawn(unsigned char port, unsigned char color)
+/* ------------------------------------------------------------------ */
+/* HUD / screens                                                      */
+/* ------------------------------------------------------------------ */
+
+static unsigned char addStr(char *b, unsigned char i, const char *s)
 {
-    if (port == 0)
+    while (*s)
+        b[i++] = *s++;
+    return i;
+}
+
+static unsigned char addNum2(char *b, unsigned char i, unsigned char v)
+{
+    b[i++] = '0' + ((v / 10) % 10);
+    b[i++] = '0' + (v % 10);
+    return i;
+}
+
+static unsigned char addNum3(char *b, unsigned char i, unsigned int v)
+{
+    b[i++] = '0' + ((v / 100) % 10);
+    b[i++] = '0' + ((v / 10) % 10);
+    b[i++] = '0' + (v % 10);
+    return i;
+}
+
+static void updateHUD(void)
+{
+    char buf[40];
+    unsigned char i = 0, len;
+    i = addStr(buf, i, "P1 ");
+    i = addNum2(buf, i, landPct(0));
+    i = addStr(buf, i, "% K");
+    i = addNum2(buf, i, pkills[0]);
+    i = addStr(buf, i, "     ");
+    i = addNum3(buf, i, (unsigned int)(timeLeft / 12));
+    i = addStr(buf, i, "S     P2 ");
+    i = addNum2(buf, i, landPct(1));
+    i = addStr(buf, i, "% K");
+    i = addNum2(buf, i, pkills[1]);
+    buf[i] = 0;
+    len = i;
+    renderlib_drawstring((ARENA_W - len) / 2, 0, color_white, buf);
+}
+
+static void drawTitle(void)
+{
+    renderlib_drawstring(8, 6, color_yellow, "MULTIDORE 64");
+    renderlib_drawstring(3, 9, color_white, "TAKE THE LAND - CLOSE LOOPS - LIVE");
+    renderlib_drawstring(2, 12, color_light_red, "P1: WASD OR JOYSTICK 1");
+    renderlib_drawstring(2, 13, color_light_blue, "P2: CURSOR KEYS OR JOYSTICK 2");
+    renderlib_drawstring(1, 16, color_grey, "WALLS AND YOUR OWN TRAIL KILL");
+    renderlib_drawstring(3, 17, color_grey, "CUT TRAILS TO KILL ENEMIES");
+    renderlib_drawstring(3, 20, color_white, "PRESS SPACE/FIRE TO START");
+}
+
+/* returns 1 = start round, 0 = quit */
+static unsigned char waitStart(void)
+{
+    while (1)
     {
-        draw(p1_x, p1_y, map[p1_x][p1_y]);
-        replaceColor(player1_color, color);
-        restoreFromMap(player1_character_color);
-        p1_x = rand() % 37;
-        p1_y = rand() % 22;
-        while (p1_x == p2_x && p1_y == p2_y)
+        soundlib_update();
+        controller_poll(0);
+        controller_poll(1);
+        if (controller_joy_fire(0) || controller_joy_fire(1))
+            return 1;
+        if (kbhit())
         {
-            p1_x = rand() % 37;
-            p1_y = rand() % 22;
+            char k = getch();
+            if (k == 0x20 || k == 0x0D)
+                return 1;
+            if (k == 0x51 || k == 0x71)
+                return 0;
         }
-        drawPlayerSquare(0);
-        p1_lastDir = 1;
-        p1_bo = 0;
-        p1_nd = 0;
     }
+}
+
+/* returns 1 = rematch, 0 = quit */
+static unsigned char gameOverScreen(void)
+{
+    unsigned char pct1 = landPct(0), pct2 = landPct(1);
+    char buf[40];
+    unsigned char i, len;
+    while (kbhit())
+        getch();                    /* swallow stale keys */
+
+    renderlib_clear(0);
+    if (pct1 > pct2)
+        renderlib_drawstring(13, 8, color_light_red, "PLAYER 1 WINS");
+    else if (pct2 > pct1)
+        renderlib_drawstring(13, 8, color_light_blue, "PLAYER 2 WINS");
     else
+        renderlib_drawstring(17, 8, color_white, "DRAW");
+
+    i = 0;
+    i = addNum2(buf, i, pct1);
+    i = addStr(buf, i, "% - ");
+    i = addNum2(buf, i, pct2);
+    i = addStr(buf, i, "%");
+    buf[i] = 0;
+    renderlib_drawstring((ARENA_W - i) / 2, 11, color_white, buf);
+
+    i = addStr(buf, 0, "KILLS ");
+    i = addNum2(buf, i, pkills[0]);
+    i = addStr(buf, i, " : ");
+    i = addNum2(buf, i, pkills[1]);
+    buf[i] = 0;
+    renderlib_drawstring((ARENA_W - i) / 2, 12, color_white, buf);
+
+    renderlib_drawstring(6, 16, color_white, "SPACE = REMATCH   Q = QUIT");
+    len = 0; (void)len;
+
+    while (1)
     {
-        draw(p2_x, p2_y, map[p2_x][p2_y]);
-        replaceColor(player2_color, color);
-        restoreFromMap(player2_character_color);
-        // Do not spawn on the same position as player 1
-        p2_x = rand() % 37;
-        p2_y = rand() % 22;
-        while (p2_x == p1_x && p2_y == p1_y)
+        controller_poll(0);
+        controller_poll(1);
+        if (controller_joy_fire(0) || controller_joy_fire(1))
+            return 1;
+        if (kbhit())
         {
-            p2_x = rand() % 37;
-            p2_y = rand() % 22;
+            char k = getch();
+            if (k == 0x20 || k == 0x0D)
+                return 1;
+            if (k == 0x51 || k == 0x71)
+                return 0;
         }
-        drawPlayerSquare(1);
-        p2_lastDir = 1;
-        p2_bo = 0;
-        p2_nd = 0;
     }
 }
 
-void handleInput(unsigned char port)
+/* ------------------------------------------------------------------ */
+/* Round setup                                                        */
+/* ------------------------------------------------------------------ */
+
+static void resetRound(void)
 {
-    signed char prevX, prevY;
-    signed char prevLastDir;
-    controller_poll(port);
-    if (port == 0)
+    unsigned char x, y;
+    for (x = 0; x < 40; x++)
+        for (y = 0; y < 25; y++)
+            map[x][y] = CELL_EMPTY;
+    px[0] = px[1] = py[0] = py[1] = 0;
+    pdir[0] = pdir[1] = 0;
+    palive[0] = palive[1] = 0;
+    ptrail[0] = ptrail[1] = 0;
+    prespawn[0] = prespawn[1] = 0;
+    pkills[0] = pkills[1] = 0;
+    p1key = p2key = 0;
+    timeLeft = ROUND_TICKS;
+
+    renderlib_clear(0);
+    placeBase(0, 10, 12);
+    placeBase(1, 29, 12);
+    updateHUD();
+}
+
+/* ------------------------------------------------------------------ */
+/* Main                                                               */
+/* ------------------------------------------------------------------ */
+
+/* Drain all buffered keys. Sets p1key/p2key to the last direction key
+   seen for each player this tick; returns 1 if Q (quit) was pressed. */
+static unsigned char readKeys(void)
+{
+    while (kbhit())
     {
-        prevX = p1_x;
-        prevY = p1_y;
-        prevLastDir = p1_lastDir;
-        if (p1_lastDir == 0)
+        char k = getch();
+        switch (k)
         {
-            // standing still: only a fresh input starts movement
-            if (controller_joy_up(port) || currentKey == 0x57 || currentKey == 0x77)          // W
-            {
-                p1_y--;
-                p1_lastDir = 2;
-            }
-            else if (controller_joy_down(port) || currentKey == 0x53 || currentKey == 0x73)   // S
-            {
-                p1_y++;
-                p1_lastDir = 3;
-            }
-            else if (controller_joy_left(port) || currentKey == 0x41 || currentKey == 0x61)   // A
-            {
-                p1_x--;
-                p1_lastDir = 4;
-            }
-            else if (controller_joy_right(port) || currentKey == 0x44 || currentKey == 0x64)  // D
-            {
-                p1_x++;
-                p1_lastDir = 5;
-            }
-            if (prevLastDir == 0 && p1_lastDir != 0)
-            {
-                respawn(0, 0);
-                return;
-            }
-            return;
+        case 0x57: case 0x77: p1key = 1; break;    /* W */
+        case 0x53: case 0x73: p1key = 2; break;    /* S */
+        case 0x41: case 0x61: p1key = 3; break;    /* A */
+        case 0x44: case 0x64: p1key = 4; break;    /* D */
+        case 0x91: p2key = 1; break;               /* cursor up */
+        case 0x11: p2key = 2; break;               /* cursor down */
+        case 0x9D: p2key = 3; break;               /* cursor left */
+        case 0x1D: p2key = 4; break;               /* cursor right */
+        case 0x51: case 0x71: return 1;            /* Q */
+        default: break;
         }
-        if (p1_lastDir == 1)
-        {
-            return;
-        }
-        // moving: keep gliding in the current direction
-        if (p1_lastDir == 2)
-        {
-            p1_y--;
-        }
-        else if (p1_lastDir == 3)
-        {
-            p1_y++;
-        }
-        else if (p1_lastDir == 4)
-        {
-            p1_x--;
-        }
-        else if (p1_lastDir == 5)
-        {
-            p1_x++;
-        }
-        // steering while gliding
-        if (controller_joy_up(port) || currentKey == 0x57 || currentKey == 0x77)
-        {
-            if (p1_lastDir != 3) { p1_y--; p1_lastDir = 2; }
-        }
-        else if (controller_joy_down(port) || currentKey == 0x53 || currentKey == 0x73)
-        {
-            if (p1_lastDir != 2) { p1_y++; p1_lastDir = 3; }
-        }
-        else if (controller_joy_left(port) || currentKey == 0x41 || currentKey == 0x61)
-        {
-            if (p1_lastDir != 5) { p1_x--; p1_lastDir = 4; }
-        }
-        else if (controller_joy_right(port) || currentKey == 0x44 || currentKey == 0x64)
-        {
-            if (p1_lastDir != 4) { p1_x++; p1_lastDir = 5; }
-        }
-        if (isCollidingWith(p1_x, p1_y, player2_character_color))
-        {
-            // Player 1 dies by player 2.
-            respawn(0, player2_color);
-            return;
-        }
-        if (isCollidingWith(p1_x, p1_y, player1_character_color))
-        {
-            p1_x = prevX;
-            p1_y = prevY;
-            if (p1_nd >= nearDeathSaveTicks)
-            {
-                // Player 1 dies.
-                respawn(0, 0);
-            }
-            else
-            {
-                p1_nd++;
-            }
-            return;
-        }
-        else
-        {
-            p1_nd = 0;
-        }
-        if (isCollidingWith(prevX, prevY, 0))
-        {
-            p1_bo++;
-        }
-        if (isCollidingWith(p1_x, p1_y, player1_color) && p1_bo > 0)
-        {
-            // Fill the connected area with the player 1 color.
-            findAndFloodFill(prevX, prevY, player1_color, player1_character_color);
-            p1_bo = 0;
-        }
-        if (p1_x < 0)
-        {
-            p1_x = 0;
-            p1_lastDir = 1;
-        }
-        else if (p1_x > max_x)
-        {
-            p1_x = max_x;
-            p1_lastDir = 1;
-        }
-        if (p1_y < 0)
-        {
-            p1_y = 0;
-            p1_lastDir = 1;
-        }
-        else if (p1_y > max_y)
-        {
-            p1_y = max_y;
-            p1_lastDir = 1;
-        }
-        if (controller_joy_fire(0) || currentKey == 0x20)
-        {
-            p1_lastDir = 1;
-        }
-        draw(p1_x, p1_y, player1_character_color);
     }
-    else
-    {
-        prevX = p2_x;
-        prevY = p2_y;
-        prevLastDir = p2_lastDir;
-        if (p2_lastDir == 0)
-        {
-            if (controller_joy_up(port))
-            {
-                p2_y--;
-                p2_lastDir = 2;
-            }
-            else if (controller_joy_down(port))
-            {
-                p2_y++;
-                p2_lastDir = 3;
-            }
-            else if (controller_joy_left(port))
-            {
-                p2_x--;
-                p2_lastDir = 4;
-            }
-            else if (controller_joy_right(port))
-            {
-                p2_x++;
-                p2_lastDir = 5;
-            }
-            if (prevLastDir == 0 && p2_lastDir != 0)
-            {
-                respawn(1, 0);
-                return;
-            }
-            return;
-        }
-        if (p2_lastDir == 1)
-        {
-            return;
-        }
-        if (p2_lastDir == 2)
-        {
-            p2_y--;
-        }
-        else if (p2_lastDir == 3)
-        {
-            p2_y++;
-        }
-        else if (p2_lastDir == 4)
-        {
-            p2_x--;
-        }
-        else if (p2_lastDir == 5)
-        {
-            p2_x++;
-        }
-        if (controller_joy_up(port))
-        {
-            if (p2_lastDir != 3) { p2_y--; p2_lastDir = 2; }
-        }
-        else if (controller_joy_down(port))
-        {
-            if (p2_lastDir != 2) { p2_y++; p2_lastDir = 3; }
-        }
-        else if (controller_joy_left(port))
-        {
-            if (p2_lastDir != 5) { p2_x--; p2_lastDir = 4; }
-        }
-        else if (controller_joy_right(port))
-        {
-            if (p2_lastDir != 4) { p2_x++; p2_lastDir = 5; }
-        }
-        if (isCollidingWith(p2_x, p2_y, player1_character_color))
-        {
-            // Player 2 dies by player 1.
-            respawn(1, player1_color);
-            return;
-        }
-        if (isCollidingWith(p2_x, p2_y, player2_character_color))
-        {
-            p2_x = prevX;
-            p2_y = prevY;
-            if (p2_nd >= nearDeathSaveTicks)
-            {
-                // Player 2 dies.
-                respawn(1, 0);
-            }
-            else
-            {
-            }
-            return;
-        }
-        else
-        {
-            p2_nd = 0;
-        }
-        if (isCollidingWith(prevX, prevY, 0))
-        {
-            p2_bo++;
-        }
-        if (isCollidingWith(p2_x, p2_y, player2_color) && p2_bo > 0)
-        {
-            // Fill the connected area with the player 2 color.
-            findAndFloodFill(prevX, prevY, player2_color, player2_character_color);
-            p2_bo = 0;
-        }
-        if (p2_x < 0)
-        {
-            p2_x = 0;
-            p2_lastDir = 1;
-        }
-        else if (p2_x > max_x)
-        {
-            p2_x = max_x;
-            p2_lastDir = 1;
-        }
-        if (p2_y < 0)
-        {
-            p2_y = 0;
-            p2_lastDir = 1;
-        }
-        else if (p2_y > max_y)
-        {
-            p2_y = max_y;
-            p2_lastDir = 1;
-        }
-        if (controller_joy_fire(port))
-        {
-            p2_lastDir = 1;
-        }
-        draw(p2_x, p2_y, player2_character_color);
-    }
+    return 0;
 }
 
 int main(void)
 {
-    int timeLeft = GAME_TICKS;
-    int p1Score = 0;
-    int p2Score = 0;
-    int i;
-    int j;
-
     renderlib_init();
     soundlib_init();
     controller_init();
 
+    /* Title screen: let the drive settle after the autostart LOAD
+       before touching the IEC bus, then start the music. */
     sleep(50);
-    renderlib_drawstring(3, max_y / 2, color_white, "press space/fire button to start");
+    drawTitle();
     soundlib_play_file("song.bin");
-    while (1)
-    {
-        soundlib_update();
-        if (controller_ispressed(0x20) || controller_joy_fire(0) || controller_joy_fire(1))
-        {
-            break;
-        }
-    }
+
+    if (!waitStart())
+        goto quit;
     soundlib_stop();
-    renderlib_clear(0);
 
-    resetGame();
-
-    // Game Loop
     while (1)
     {
-        // capture the keyboard once per frame; getch() consumes the buffer,
-        // so reading it repeatedly (per player, per direction) would lose keys
-        currentKey = kbhit() ? getch() : 0;
-
-        // check if the letter "Q" was pressed
-        if (currentKey == 0x51 || currentKey == 0x71)
+        resetRound();
+        while (1)
         {
-            // if so, exit the program
+            if (readKeys())
+                goto quit;
+            handlePlayer(0);
+            handlePlayer(1);
+            p1key = p2key = 0;
+            updateHUD();
+            sleep(TICK_FRAMES);
+            if (landPct(0) >= WIN_PCT || landPct(1) >= WIN_PCT)
+                break;
+            if (--timeLeft == 0)
+                break;
+        }
+        if (!gameOverScreen())
             break;
-        }
-
-        // Handle Player Input
-        handleInput(0);
-        handleInput(1);
-
-        sleep(GAME_TICK_FRAMES);
-
-        if (timeLeft > 0)
-        {
-            timeLeft--;
-        }
-        else
-        {
-            // Game over
-            // Check who won (the playfield is the 40x25 text grid)
-            for (i = 0; i < 40; i++)
-            {
-                for (j = 0; j < 25; j++)
-                {
-                    if (renderlib_getpixel(i, j) == player1_color)
-                    {
-                        p1Score++;
-                    }
-                    else if (renderlib_getpixel(i, j) == player2_color)
-                    {
-                        p2Score++;
-                    }
-                }
-            }
-            renderlib_clear(0);
-            if (p1Score > p2Score)
-            {
-                // Player 1 wins
-                renderlib_drawstring(max_x / 2 - 7, max_y / 2, color_white, "Player 1 wins!");
-            }
-            else if (p2Score > p1Score)
-            {
-                // Player 2 wins
-                renderlib_drawstring(max_x / 2 - 7, max_y / 2, color_white, "Player 2 wins!");
-            }
-            else
-            {
-                // Draw
-                renderlib_drawstring(max_x / 2 - 2, max_y / 2, color_white, "Draw!");
-            }
-            sleep(200);
-            resetGame();
-            timeLeft = GAME_TICKS;
-            p1Score = 0;
-            p2Score = 0;
-        }
     }
+
+quit:
     renderlib_unload();
     return EXIT_SUCCESS;
 }

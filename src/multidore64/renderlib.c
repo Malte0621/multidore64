@@ -22,9 +22,13 @@ static volatile char * const palette = (volatile char *)0xd021;
 static unsigned char currentMode = RMODE_TEXT;
 static unsigned char hasBeenInitialized = 0;
 
-/* Iterative floodfill stack (max 320*200=64000 pixels in hires, but we
-   limit to 40*25=1000 cells in text mode. Use 2000 entries for safety.) */
-static unsigned char ff_stack[4000];
+/* Floodfill stack at a fixed address in the otherwise-unused RAM at $C000.
+   It must NOT be a normal BSS array: the linker grew BSS past $4000, right
+   over the SID tune staging area, so fills corrupted a running tune (and
+   vice versa). 2000 bytes holds every cell of a 40x25 screen pushed once
+   with the mark-on-push fill. */
+#define ff_stack ((unsigned char *)0xC000)
+#define FF_STACK_MAX 2000
 static unsigned int ff_sp = 0;
 
 /*
@@ -79,8 +83,11 @@ static void plot_text(unsigned char x, unsigned char y, unsigned char color)
     unsigned int cell;
     if (x >= 40 || y >= 25) return;
     cell = y * 40 + x;
-    charram[cell] = ' ';   /* always a blank glyph: the cell reads as a solid
-                              colored square, never as a leftover character */
+    charram[cell] = 0xA0;   /* reversed space: all 64 pixels set, so the
+                                cell renders as a solid square in the
+                                color-RAM color. A plain space (0x20) has no
+                                set pixels and would show the background
+                                color instead, making the pixel invisible. */
     colram[cell] = color;
 }
 
@@ -152,12 +159,11 @@ void renderlib_clear(unsigned char color)
     }
     else
     {
-        /* Text mode: clear color RAM */
+        /* Text mode: fill with solid blocks in the given color */
         for (unsigned int i = 0; i < 1000; i++)
             colram[i] = color;
-        /* Clear character RAM to spaces */
         for (unsigned int i = 0; i < 1000; i++)
-            charram[i] = ' ';
+            charram[i] = 0xA0;
     }
 }
 
@@ -502,7 +508,14 @@ void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, 
     const unsigned char sw = (unsigned char)renderlib_screen_w();
     const unsigned char sh = (unsigned char)renderlib_screen_h();
 
+    /* Cells are colored the moment they are pushed, so every cell enters
+       the stack at most once: a 40x25 text screen needs at most 1000 cells
+       * 2 bytes = 2000 bytes of stack. The previous push-unmarked version
+       could queue a cell once per neighbour (4x) and write past ff_stack,
+       corrupting memory. The ff_sp guard is kept as a hard safety net for
+       bitmap modes, where the fill degrades instead of crashing. */
     ff_sp = 0;
+    renderlib_plot(x, y, color);
     ff_stack[ff_sp++] = x;
     ff_stack[ff_sp++] = y;
 
@@ -510,13 +523,10 @@ void renderlib_floodfill(unsigned char x, unsigned char y, unsigned char color, 
     {
         unsigned char py = ff_stack[--ff_sp];
         unsigned char px = ff_stack[--ff_sp];
-        unsigned char pc = renderlib_getpixel(px, py);
-        if (pc == stopColor || pc == color) continue;
-        renderlib_plot(px, py, color);
-        if (px > 0)         { unsigned char c = renderlib_getpixel(px - 1, py); if (c != stopColor && c != color) { ff_stack[ff_sp++] = px - 1; ff_stack[ff_sp++] = py; } }
-        if (px + 1 < sw)    { unsigned char c = renderlib_getpixel(px + 1, py); if (c != stopColor && c != color) { ff_stack[ff_sp++] = px + 1; ff_stack[ff_sp++] = py; } }
-        if (py > 0)         { unsigned char c = renderlib_getpixel(px, py - 1); if (c != stopColor && c != color) { ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py - 1; } }
-        if (py + 1 < sh)    { unsigned char c = renderlib_getpixel(px, py + 1); if (c != stopColor && c != color) { ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py + 1; } }
+        if (px > 0)      { unsigned char c = renderlib_getpixel(px - 1, py); if (c != stopColor && c != color && ff_sp < FF_STACK_MAX - 2) { renderlib_plot(px - 1, py, color); ff_stack[ff_sp++] = px - 1; ff_stack[ff_sp++] = py; } }
+        if (px + 1 < sw) { unsigned char c = renderlib_getpixel(px + 1, py); if (c != stopColor && c != color && ff_sp < FF_STACK_MAX - 2) { renderlib_plot(px + 1, py, color); ff_stack[ff_sp++] = px + 1; ff_stack[ff_sp++] = py; } }
+        if (py > 0)      { unsigned char c = renderlib_getpixel(px, py - 1); if (c != stopColor && c != color && ff_sp < FF_STACK_MAX - 2) { renderlib_plot(px, py - 1, color); ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py - 1; } }
+        if (py + 1 < sh) { unsigned char c = renderlib_getpixel(px, py + 1); if (c != stopColor && c != color && ff_sp < FF_STACK_MAX - 2) { renderlib_plot(px, py + 1, color); ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py + 1; } }
     }
 }
 
@@ -532,7 +542,11 @@ char renderlib_findcenter(unsigned char x, unsigned char y, unsigned char *outX,
     const unsigned char sw = (unsigned char)renderlib_screen_w();
     const unsigned char sh = (unsigned char)renderlib_screen_h();
 
+    /* Same mark-on-push discipline as renderlib_floodfill: a cell is
+       blanked (plotted 0) when pushed, so it can never be queued twice
+       and the stack cannot outgrow ff_stack. */
     ff_sp = 0;
+    renderlib_plot(x, y, 0);
     ff_stack[ff_sp++] = x;
     ff_stack[ff_sp++] = y;
 
@@ -540,17 +554,14 @@ char renderlib_findcenter(unsigned char x, unsigned char y, unsigned char *outX,
     {
         unsigned char py = ff_stack[--ff_sp];
         unsigned char px = ff_stack[--ff_sp];
-        unsigned char pc = renderlib_getpixel(px, py);
-        if (pc != color) continue;
-        renderlib_plot(px, py, 0); /* mark as visited */
         if (px < minX) minX = px;
         if (px > maxX) maxX = px;
         if (py < minY) minY = py;
         if (py > maxY) maxY = py;
-        if (px > 0)    { if (renderlib_getpixel(px - 1, py) == color) { ff_stack[ff_sp++] = px - 1; ff_stack[ff_sp++] = py; } }
-        if (px + 1 < sw) { if (renderlib_getpixel(px + 1, py) == color) { ff_stack[ff_sp++] = px + 1; ff_stack[ff_sp++] = py; } }
-        if (py > 0)    { if (renderlib_getpixel(px, py - 1) == color) { ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py - 1; } }
-        if (py + 1 < sh) { if (renderlib_getpixel(px, py + 1) == color) { ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py + 1; } }
+        if (px > 0)      { if (renderlib_getpixel(px - 1, py) == color && ff_sp < FF_STACK_MAX - 2) { renderlib_plot(px - 1, py, 0); ff_stack[ff_sp++] = px - 1; ff_stack[ff_sp++] = py; } }
+        if (px + 1 < sw) { if (renderlib_getpixel(px + 1, py) == color && ff_sp < FF_STACK_MAX - 2) { renderlib_plot(px + 1, py, 0); ff_stack[ff_sp++] = px + 1; ff_stack[ff_sp++] = py; } }
+        if (py > 0)      { if (renderlib_getpixel(px, py - 1) == color && ff_sp < FF_STACK_MAX - 2) { renderlib_plot(px, py - 1, 0); ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py - 1; } }
+        if (py + 1 < sh) { if (renderlib_getpixel(px, py + 1) == color && ff_sp < FF_STACK_MAX - 2) { renderlib_plot(px, py + 1, 0); ff_stack[ff_sp++] = px; ff_stack[ff_sp++] = py + 1; } }
     }
 
     /* Restore the region */
@@ -704,14 +715,16 @@ void renderlib_sprite_all_enable(unsigned char enabled)
 Character operations (text modes)
 ----------------------------------------------------------
 
-/* ASCII to C64 screen code conversion (standard C64, unshifted mode).
-   Space/!-? (0x20-0x3F): same as ASCII. @: 0x00. A-Z: same as ASCII.
-   a-z (0x61-0x7A): ascii - 96. */
+/* ASCII to C64 screen code conversion (standard C64, uppercase charset).
+   Space/!-? (0x20-0x3F) and digits: identical in both encodings.
+   @ -> 0x00, A-Z -> 0x01-0x1A (c - 0x40), a-z -> 0x01-0x1A (c - 96).
+   Screen codes 0x41-0x5A are graphic glyphs, NOT letters - returning
+   uppercase ASCII unchanged renders every capital letter as junk. */
 static unsigned char ascii2scr(unsigned char c)
 {
     if (c >= 0x20 && c <= 0x3F) return c;
     if (c == 0x40) return 0x00;
-    if (c >= 0x41 && c <= 0x5A) return c;
+    if (c >= 0x41 && c <= 0x5A) return c - 0x40;
     if (c >= 0x61 && c <= 0x7A) return c - 96;
     return 0x20;
 }
@@ -821,7 +834,12 @@ void renderlib_init(void)
        $D011=$1B (DEN|RSEL|YSCROLL 3), $D016=$08 (40 columns),
        $D018=$15 (screen $0400, char ROM at $1000). Charset selector
        0 would read RAM at $0000, not the character ROM. */
-    cia2.pra = (cia2.pra & 0xfc) | 0x03; /* VIC bank 0 */
+    /* VIC bank 0 with all IEC lines (bits 3-5) explicitly released.
+       NEVER read-modify-write $DD00: reading returns the live pin state,
+       so while the drive is still finishing the autostart LOAD the IEC
+       lines can read low, and writing them back latches ATN/CLOCK/DATA
+       asserted forever - every later disk operation then hangs. */
+    cia2.pra = 0x3F;
     vic.ctrl1 = 0x1B;
     vic.ctrl2 = 0x08;
     vic.memptr = 0x15;
