@@ -103,7 +103,14 @@ void renderlib_setborder(unsigned char color);
 void renderlib_setcolor(unsigned char background, unsigned char foreground);
 
 /*
-----------------------------signed char n, unsigned char enabled);
+----------------------------------------------------------
+Hardware sprites (VIC-II, 8 sprites)
+----------------------------------------------------------
+*/
+void renderlib_sprite_enable(unsigned char n, unsigned char enabled);
+void renderlib_sprite_pos(unsigned char n, unsigned char x, unsigned char y);
+void renderlib_sprite_color(unsigned char n, unsigned char color);
+void renderlib_sprite_multicolor(unsigned char n, unsigned char enabled);
 void renderlib_sprite_expand(unsigned char n, unsigned char x2, unsigned char y2);
 void renderlib_sprite_data(unsigned char n, unsigned char pointer);
 void renderlib_sprite_all_enable(unsigned char enabled);

@@ -10,6 +10,8 @@ MultiDore 64 - A decent game engine for the commodore 64!
 #ifndef UTILSLIB_H
 #define UTILSLIB_H
 
-void sleep(unsigned int ns);
+/** Block for `frames` video frames (one frame = 1/50 s on PAL).
+ *  Paces against the VIC raster, so the delay is real time. */
+void sleep(unsigned int frames);
 
 #endif

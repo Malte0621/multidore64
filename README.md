@@ -23,8 +23,12 @@ Multidore64 is a game engine for the commodore 64. It is written in C and is des
 * Download the source code
 * Install oscar64
 * Change the `main.c` file to suit your needs
-* Compile the source code with oscar64
+* Compile the source code with oscar64 (`./compile.sh` or `compile.bat`)
 * Run the resulting binary in your favorite commodore 64 emulator
+
+### Documentation
+Full engine documentation lives in [`docs/`](docs/), with rendered pages in
+[`docs/site/`](docs/site/index.html) - build them with `python3 tools/gendocs.py`.
 
 ### How to contribute
 * Fork the repository

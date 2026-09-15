@@ -1,4 +1,6 @@
 .vscode
 build
 dist
-*.bak
+*.bakdocs/site
+
+docs/site
